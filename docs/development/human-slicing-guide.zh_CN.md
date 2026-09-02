@@ -19,9 +19,7 @@
 ---
 
 ## 1. 做一个角色：去生成器捏 → 下载整表
-
-1. 浏览器打开 **Universal LPC 角色生成器**：
-   `sanderfrenken.github.io/Universal-LPC-Spritesheet-Character-Generator`
+1. 浏览器打开 [Universal LPC 角色生成器](https://sanderfrenken.github.io/Universal-LPC-Spritesheet-Character-Generator/)：
 2. 捏好你的角色（身体 / 发型 / 衣服…）。
 3. 点 **Download sheet**，得到一张**整表 PNG**。
 4. 给它起个**英文小写短名**（只用字母，例：`hero`），下面命令都用它。

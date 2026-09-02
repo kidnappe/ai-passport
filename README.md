@@ -30,6 +30,7 @@ comment in its file headers.
 | **Wi-Fi provisioning** | **final: 小智's hotspot provisioning** — [`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect) (softAP + captive portal) | MIT | `components/passport_wifi_ap/` (the earlier BLE provisioning in `main/ble_prov.c` was reworked into hotspot) |
 | **Voice input** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | `components/passport_voice/` + PC `companion/` |
 | **PPT remote** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | `components/passport_ppt/` via official `esp_hid` |
+| **Home avatar (animated sprite)** | the base platform's `pet` sprite engine, re-tiered & renamed `human_display` (`pet_*`→`human_*`) — [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport) | — | `components/human_display/`; frames compiled into firmware, generated from LPC sheets via `tools/lpc2pet.py` + `tools/prep_pet.py` |
 
 ---
 
