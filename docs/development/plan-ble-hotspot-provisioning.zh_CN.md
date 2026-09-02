@@ -29,7 +29,7 @@
 - 新建备份目录：`E:\code\ai passport\backup\2026-09-01_xiaozhi移植完成态\`
 - 备份内容：
   - `o-platform/` 完整源码（**排除** `build/`、`managed_components/`、`sdkconfig`、`backup/`，与既有备份习惯一致）
-  - 相关文档：`docs/porting-pipeline.zh_CN.md`、`docs/xiaozhi-handoff-2026-08-31.zh_CN.md` 及其余小智相关 `.md`
+  - 相关文档：`docs/porting-pipeline.zh_CN.md`、`docs/development/xiaozhi-porting.zh_CN.md`
   - **新增** `README.md`：整份小智移植项目概览（见第四节大纲）
 - 输出：`o-platform-src.tar.gz` + `README.md`
 
