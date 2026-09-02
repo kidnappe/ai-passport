@@ -109,6 +109,30 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
 
 > **密钥安全**：ASR key 只放 `companion/config.local.json`，该文件已被 **git 忽略**。绝不提交真实密钥。
 
+## 更换主页动态头像
+
+主页头像是**编译进固件**的逐帧精灵（不是运行时上传的）。引擎**只显示一个**角色——即
+`components/human_display/human/human_manifest.h` 里登记的那一个。仓库带了**两套源图**
+（`humans/mage`、`humans/cowboy`），选哪个上屏：
+
+```bash
+python tools/prep_pet.py --src humans/cowboy     # 把总表重写成这个人物
+powershell .\tools\build.ps1 -Flash              # 重新编译并烧录
+```
+
+想用你自己的角色：去 **Universal LPC 角色生成器**
+（`sanderfrenken.github.io/Universal-LPC-Spritesheet-Character-Generator`）捏好、
+**Download sprite sheet** 下载整表，再切片→转换→烧录：
+
+```bash
+python tools/lpc2pet.py <整表>.png <名> --only stand,walk,walkfront
+python tools/prep_pet.py --src humans/<名>
+powershell .\tools\build.ps1 -Flash
+```
+
+完整说明（命名契约、运动预设、常见坑）见
+[`docs/development/human-slicing-guide.zh_CN.md`](docs/development/human-slicing-guide.zh_CN.md)。
+
 ## 状态
 
 开发 / 演示分支。语音输入与 PPT 控制已在真机走通，非正式发布。

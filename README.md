@@ -123,6 +123,31 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
 > **Secrets:** the ASR key lives only in `companion/config.local.json`, which is **git-ignored**.
 > Never commit real keys.
 
+## Changing the on-screen avatar
+
+The home-page avatar is an animated sprite **compiled into the firmware** (not uploaded at
+runtime). The engine shows **one** character — the one registered in
+`components/human_display/human/human_manifest.h`. Two ships with source PNGs (`humans/mage`,
+`humans/cowboy`); pick which one appears:
+
+```bash
+python tools/prep_pet.py --src humans/cowboy     # rewrite the manifest to this character
+powershell .\tools\build.ps1 -Flash              # rebuild + flash
+```
+
+To use your own: download a sprite sheet from the
+[Universal LPC character generator](https://sanderfrenken.github.io/Universal-LPC-Spritesheet-Character-Generator/),
+slice it, regenerate, flash:
+
+```bash
+python tools/lpc2pet.py <sheet>.png <name> --only stand,walk,walkfront
+python tools/prep_pet.py --src humans/<name>
+powershell .\tools\build.ps1 -Flash
+```
+
+Full walkthrough (naming contract, motion presets, pitfalls):
+[`docs/development/human-slicing-guide.zh_CN.md`](docs/development/human-slicing-guide.zh_CN.md).
+
 ## Status
 
 Development / demo branch. Voice input and PPT control verified on real hardware. Not an official release.
