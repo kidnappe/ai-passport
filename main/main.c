@@ -36,7 +36,7 @@
 static const char *TAG = "o-platform";
 #define EVENT_QUEUE_DEPTH 16
 #define SETTINGS_VALUE_ROW_COUNT 4
-#define SETTINGS_LIST_ROW_COUNT (SETTINGS_VALUE_ROW_COUNT + 3)
+#define SETTINGS_LIST_ROW_COUNT (SETTINGS_VALUE_ROW_COUNT + 4)   /* +网络与连接/动态头像/设备信息/主题 */
 
 typedef enum {
     VIEW_LAUNCHER = 0,
@@ -290,18 +290,9 @@ static void show_home(void)
     lv_obj_set_style_radius(img_placeholder, 4, 0);
     lv_obj_set_style_clip_corner(img_placeholder, true, 0);
 
-    /* 头像模式：/passport/avatar_mode 为 "photo" 时显示静态照片，其余（含缺省）为动态宠物 */
-    bool pet_mode = true;
-    {
-        char mb[16] = {0};
-        size_t ml = 0;
-        char mpath[64];
-        snprintf(mpath, sizeof(mpath), PASSPORT_FS_ROOT "/avatar_mode");
-        if (passport_storage_read_text(mpath, mb, sizeof(mb), &ml) == ESP_OK && ml > 0 &&
-            strncmp(mb, "photo", 5) == 0) {
-            pet_mode = false;
-        }
-    }
+    /* 头像模式：设置里的"动态头像"开关(NVS bool dyn, 默认开)=动态精灵；关=静态照片
+     * avatar.raw。关但照片缺失/尺寸不符 → 回落动态，避免空白。 */
+    bool pet_mode = nvs_get_bool("dyn", true);
 
     free(s_avatar_dsc); s_avatar_dsc = NULL;
     free(s_avatar_buf); s_avatar_buf = NULL;
@@ -337,10 +328,10 @@ static void show_home(void)
         fclose(f);
     }
     if (!s_avatar_dsc) {
-        lv_obj_t *ph_label = lv_label_create(img_placeholder);
-        lv_obj_set_style_text_color(ph_label, lv_color_hex(0x555555), 0);
-        lv_obj_center(ph_label);
-        lv_label_set_text(ph_label, "头像");
+        /* 想显示静态照片但文件缺失/尺寸不符 → 回落动态精灵，不留空白 */
+        human_display_start(&(human_display_cfg_t){
+            .parent = img_placeholder, .box_w = img_w, .box_h = img_h,
+        });
     }
     } /* photo 模式结束 */
 
@@ -349,19 +340,19 @@ static void show_home(void)
     int info_w = BSP_LCD_W - info_x - 3;  /* 135px：容纳「学院:马克思主义学院」（半角冒号） */
 
     static const char *field_names[] = {"nickname", "college", "major", "student_id"};
-    static const char *field_labels[] = {NULL, "学院", "专业", "学号"}; /* 除昵称外显示「标签:值」（半角冒号省宽） */
+    static const char *field_deflabels[] = {NULL, "学院", "专业", "学号"}; /* 标签可被 {名}_label.txt 覆盖 */
     static const char *field_defaults[] = {"o-Platform", "", "", ""};
     uint32_t field_colors[] = {0xFFFFFF, 0xCCCCCC, 0xCCCCCC, 0x888888};
     lv_obj_t **field_ptrs[] = {&s_home_nickname, &s_home_college, &s_home_major, &s_home_student_id};
 
+    int vis_secondary = 0;   /* 已显示的第二类行数（用于紧凑排布，空行跳过） */
     for (int i = 0; i < 4; i++) {
         char path[64];
         char buf[64] = {0};
         char value[64] = {0};
-        char text[112];
+        char text[128];
         size_t len = 0;
 
-        /* Field text：读取后 trim 首尾换行/空白，治愈历史传输写入的换行前缀 */
         snprintf(path, sizeof(path), PASSPORT_FS_ROOT "/%s.txt", field_names[i]);
         if (passport_storage_read_text(path, buf, sizeof(buf), &len) == ESP_OK && len > 0) {
             char *sv = buf;
@@ -371,44 +362,60 @@ static void show_home(void)
                 sv[--sl] = 0;
             snprintf(value, sizeof(value), "%s", sv);
         }
-        if (field_labels[i]) {
-            snprintf(text, sizeof(text), "%s:%s", field_labels[i], value);
-        } else {
-            snprintf(text, sizeof(text), "%s", value[0] ? value : field_defaults[i]);
-        }
 
-        /* Field colour */
+        /* 昵称为空用默认；其余三行值为空 → 整行不显示 */
+        if (i == 0 && !value[0]) snprintf(value, sizeof(value), "%s", field_defaults[0]);
+        if (i != 0 && !value[0]) { *field_ptrs[i] = NULL; continue; }
+
+        /* 标签(第二类行可自定义 {名}_label.txt；无则用默认；昵称无标签) */
+        char label[24] = {0};
+        if (i != 0) {
+            char lp[64]; size_t ll = 0; char lb[24] = {0};
+            snprintf(lp, sizeof(lp), PASSPORT_FS_ROOT "/%s_label.txt", field_names[i]);
+            if (passport_storage_read_text(lp, lb, sizeof(lb), &ll) == ESP_OK && ll > 0) {
+                char *p = lb; while (*p=='\r'||*p=='\n') p++;
+                size_t n = strlen(p); while (n>0 && (p[n-1]=='\r'||p[n-1]=='\n')) p[--n]=0;
+                if (p[0]) snprintf(label, sizeof(label), "%s", p);
+                else if (field_deflabels[i]) snprintf(label, sizeof(label), "%s", field_deflabels[i]);
+            } else if (field_deflabels[i]) {
+                snprintf(label, sizeof(label), "%s", field_deflabels[i]);
+            }
+        }
+        if (i == 0) snprintf(text, sizeof(text), "%s", value);
+        else if (label[0]) snprintf(text, sizeof(text), "%s:%s", label, value);
+        else snprintf(text, sizeof(text), "%s", value);
+
+        /* colour */
         uint32_t color = field_colors[i];
         snprintf(path, sizeof(path), PASSPORT_FS_ROOT "/%s_color.txt", field_names[i]);
         if (passport_storage_read_text(path, buf, sizeof(buf), &len) == ESP_OK && len >= 6) {
-            buf[6] = 0;
-            unsigned int c = 0;
+            buf[6] = 0; unsigned int c = 0;
             if (sscanf(buf, "%x", &c) == 1) color = c;
         }
 
-        /* Field size: only 14/24 px font binaries exist; anything else falls to the nearest tier.
-         * 昵称固定 24px（「周旋」二字已收入 24px 紧凑字库）。 */
+        /* size (14/24 两档; 昵称固定 24) */
         int font_size = 14;
         snprintf(path, sizeof(path), PASSPORT_FS_ROOT "/%s_sz.txt", field_names[i]);
         if (passport_storage_read_text(path, buf, sizeof(buf), &len) == ESP_OK && len > 0) {
-            int parsed = 0;
-            if (sscanf(buf, "%d", &parsed) == 1) font_size = parsed;
+            int parsed = 0; if (sscanf(buf, "%d", &parsed) == 1) font_size = parsed;
         }
         if (i == 0) font_size = 24;
         const lv_font_t *field_font = passport_ui_font_size(font_size);
 
-        /* Field bold flag */
+        /* bold (合成) */
         bool bold = false;
         snprintf(path, sizeof(path), PASSPORT_FS_ROOT "/%s_bold.txt", field_names[i]);
-        if (passport_storage_read_text(path, buf, sizeof(buf), &len) == ESP_OK && len > 0) {
+        if (passport_storage_read_text(path, buf, sizeof(buf), &len) == ESP_OK && len > 0)
             bold = (buf[0] == '1');
-        }
 
-        /* Synthetic bold: the 14/24 px glyph sets have no Bold weight, so draw the
-         * same text again 1 px to the right underneath the real label. */
-        const int y = (i == 0) ? nick_y : field_y[i - 1];
-        /* 参考官方 UI 排版：昵称居中在列顶，字段列内左对齐 */
-        const lv_text_align_t align = (i == 0) ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT;
+        int y;
+        lv_text_align_t align;
+        if (i == 0) { y = nick_y; align = LV_TEXT_ALIGN_CENTER; }
+        else {
+            y = field_y[0] + vis_secondary * 28;   /* 从 68 起, 紧凑排, 空行不占位 */
+            vis_secondary++;
+            align = LV_TEXT_ALIGN_LEFT;
+        }
 
         if (bold) {
             lv_obj_t *shadow = lv_label_create(s_home_content);
@@ -420,17 +427,15 @@ static void show_home(void)
             lv_label_set_long_mode(shadow, LV_LABEL_LONG_DOT);
             lv_label_set_text(shadow, text);
         }
-
-        lv_obj_t *label = lv_label_create(s_home_content);
-        lv_obj_set_pos(label, info_x, img_y + y);
-        lv_obj_set_width(label, info_w);
-        lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
-        lv_obj_set_style_text_font(label, field_font, 0);
-        lv_obj_set_style_text_align(label, align, 0);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
-        lv_label_set_text(label, text);
-
-        *field_ptrs[i] = label;
+        lv_obj_t *label_obj = lv_label_create(s_home_content);
+        lv_obj_set_pos(label_obj, info_x, img_y + y);
+        lv_obj_set_width(label_obj, info_w);
+        lv_obj_set_style_text_color(label_obj, lv_color_hex(color), 0);
+        lv_obj_set_style_text_font(label_obj, field_font, 0);
+        lv_obj_set_style_text_align(label_obj, align, 0);
+        lv_label_set_long_mode(label_obj, LV_LABEL_LONG_DOT);
+        lv_label_set_text(label_obj, text);
+        *field_ptrs[i] = label_obj;
     }
 
     /* === Bottom bar: 参照设置页 key_bar（surface 底 + 顶部分割线），按钮叠于其上 === */
@@ -592,6 +597,9 @@ static void refresh_settings(void)
         }
         passport_ui_list_set_value(s_list, list_idx, text);
     }
+    /* 动态头像开关行（值行之后第一行），显示当前 开/关 */
+    passport_ui_list_set_value(s_list, SETTINGS_VALUE_ROW_COUNT + 1,
+                               nvs_get_bool("dyn", true) ? "开" : "关");
     const size_t selected = passport_ui_list_selected(s_list);
     const char *action = "调整";
     if (s_settings_editing) action = "确定";
@@ -610,6 +618,7 @@ static void show_settings(void)
     for (size_t i = 0; i < SETTINGS_VALUE_ROW_COUNT; ++i) {
         passport_ui_list_add_value(s_list, SETTINGS_NAMES[i], "");
     }
+    passport_ui_list_add_value(s_list, "动态头像", "");
     passport_ui_list_add(s_list, "设备信息");
     passport_ui_list_add(s_list, "主题");
     refresh_settings();
@@ -944,8 +953,14 @@ static void handle_settings_key(bsp_btn_t btn, bsp_btn_ev_t ev)
     }
     if (btn != BSP_BTN_OK || ev != BSP_BTN_CLICK) return;
     if (selected == 0) { show_network(); return; }
-    if (selected == SETTINGS_VALUE_ROW_COUNT + 1) { show_device_info(); return; }
-    if (selected == SETTINGS_VALUE_ROW_COUNT + 2) { show_themes(); return; }
+    /* 动态头像开关行：OK 直接翻转，主页即时生效 */
+    if (selected == SETTINGS_VALUE_ROW_COUNT + 1) {
+        nvs_set_bool("dyn", !nvs_get_bool("dyn", true));
+        refresh_settings();
+        return;
+    }
+    if (selected == SETTINGS_VALUE_ROW_COUNT + 2) { show_device_info(); return; }
+    if (selected == SETTINGS_VALUE_ROW_COUNT + 3) { show_themes(); return; }
     if (selected < 1 || selected >= SETTINGS_VALUE_ROW_COUNT + 1) return;
 
     s_settings_editing = !s_settings_editing;
