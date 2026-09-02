@@ -160,9 +160,12 @@ Edit it like provisioning — the device opens its own hotspot:
    hotspot `Passport-Set-xxxx`** (name shown on screen).
 2. Join that hotspot from your phone — the **edit page auto-pops** (captive portal); if it doesn't,
    open `http://192.168.4.1/` in a browser.
-3. Edit the fields (custom labels / size / colour / bold) and the avatar, then send — it applies on the
-   device home screen immediately.
-4. Uploading a photo auto-switches to **static**; re-enable **设置 → 动态头像** to go back to the animation.
+3. Edit the nickname / three lines (custom label, text, size, colour, bold) and press **保存到设备** — it's a
+   **native form POST**, so it works even inside the limited captive-portal webview. A **green ✓ "保存成功"**
+   page shows, and the change applies on the device home screen immediately.
+4. **Static avatar** needs a JS-capable browser (e.g. **Chrome** at `http://192.168.4.1/`) — the "转换并上传头像"
+   button converts the image to RGB565 and uploads it, auto-switching to static. To go back: choose 动态人物 in
+   the editor, or re-enable **设置 → 动态头像**.
 
 Stored at `/passport/{name}.txt`, `{name}_label.txt`, `{name}_sz/_color/_bold.txt`, photo `/passport/avatar.raw`,
 mode flag NVS `pass_net/dyn`.
