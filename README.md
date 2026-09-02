@@ -1,119 +1,123 @@
-# AI Passport — Voice Input + PPT Remote
+# o-platform — Voice Input + PPT Remote firmware for FoloToy AI Passport
 
 <p align="right">
   <strong>English</strong> · <a href="README.zh_CN.md">简体中文</a>
 </p>
 
-Firmware demo branch for the **FoloToy AI Passport** badge (ESP32-C3). On top of the base
-platform it ships two Bluetooth features that coexist on one shared stack:
-
-- **PPT remote** — the badge presents as a Bluetooth HID **keyboard**.
-- **Voice input** — on-device capture streams audio over a custom BLE service to a PC
-  companion that runs streaming ASR and types the transcript back into the desktop.
+**Project: `o-platform`.** Firmware for the **FoloToy AI Passport** badge (ESP32-C3) that runs two
+Bluetooth features — **PPT remote** (BLE HID keyboard) and **voice input** (on-device capture → PC
+streaming ASR → typed transcript) — **coexisting on one shared stack**.
 
 ---
 
-## What this is built on (base + porting sources)
+## 移植参考 / Porting sources
 
-This project is not written from scratch — it is a fork/derivative that composes a base
-platform plus several ported features. Per our porting pipeline
-([`docs/development/porting-pipeline.zh_CN.md`](docs/development/porting-pipeline.zh_CN.md)):
+`o-platform` is not written from scratch — it composes a base platform plus several ported
+features, per our porting pipeline
+([`docs/development/porting-pipeline.zh_CN.md`](docs/development/porting-pipeline.zh_CN.md)).
+Donor code is **re-tiered into this project's layers, not copied verbatim**, and keeps an origin
+comment in its file headers.
 
 | Part | Upstream / donor | License | Landed as |
 |---|---|---|---|
-| **Base platform** | [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport) (plugin platform: `.pap` packages, BLE install, `passport_core`/`ui`/`runtime`) | — | the `o-platform/` baseline |
-| **UI style reference** | [`FoloToy/ai-passport`](https://github.com/FoloToy/ai-passport) (official firmware, pixel-art language) | — | visual style only, not code |
+| **Base platform** | [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport) (plugin platform: `.pap` packages, BLE install, `passport_core`/`ui`/`runtime`) | — | `o-platform/` baseline |
+| **UI style reference** | [`FoloToy/ai-passport`](https://github.com/FoloToy/ai-passport) (official firmware, pixel-art language) | — | visual style only |
 | **Wi-Fi provisioning** | [`killhello/ai-pass-port-wifi`](https://github.com/killhello/ai-pass-port-wifi) | — | rewritten in-house: `main/ble_prov.c` + `components/passport_wifi_ap/` |
-| **Voice input** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | re-tiered into `components/passport_voice/` + the PC `companion/` |
-| **PPT remote** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | `components/passport_ppt/` via the official `esp_hid` component |
-
-Ported code keeps an origin comment in its file header (e.g. `voice_ble.c`,
-`components/passport_ppt/src/passport_ppt.c`).
+| **Voice input** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | `components/passport_voice/` + PC `companion/` |
+| **PPT remote** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | `components/passport_ppt/` via official `esp_hid` |
 
 ---
 
-## Hardware
+## Hardware & build
 
-- **ESP32-C3** (RISC-V, single core, ~400 KB SRAM, **no PSRAM**), 8 MB flash.
-- 240×320 SPI display (LVGL), 3 ADC buttons (UP / DOWN / OK), ES8311 audio codec + I2S,
-  CW2017 fuel gauge, USB-Serial/JTAG for flashing/logs.
-
-## Build & flash
-
-ESP-IDF **v5.5.3**. See [`docs/development/build-and-test.md`](docs/development/build-and-test.md).
-On Windows `tools/build.ps1` wraps the toolchain (E-drive ccache + Defender file-lock retry):
-
-```powershell
-.\tools\build.ps1          # incremental build
-.\tools\build.ps1 -Flash   # build then flash COM6
-```
+- **ESP32-C3** (single-core RISC-V, ~400 KB SRAM, **no PSRAM**), 8 MB flash; 240×320 SPI + LVGL;
+  3 ADC buttons; ES8311 audio + I2S; CW2017 fuel gauge; flash/log over USB-Serial/JTAG.
+- ESP-IDF **v5.5.3**. Windows: `tools/build.ps1` (E-drive ccache + file-lock retry):
+  ```powershell
+  .\tools\build.ps1          # build
+  .\tools\build.ps1 -Flash   # build + flash COM6
+  ```
+  Details: [`docs/development/build-and-test.zh_CN.md`](docs/development/build-and-test.zh_CN.md).
 
 ---
 
 ## Features — how to use
 
-### 1. Electronic badge
-Home page shows the badge fields (nickname / school / major / student id) and an avatar.
-Edit them from the PC with the transfer page on-device (`main/transfer_page.c` starts a
-small HTTP server; upload from the companion transfer tool). Changes apply on returning home.
+**PPT remote (BLE HID keyboard):** open the **PPT 遥控** page → pair in OS Bluetooth settings →
+UP = previous slide (←), DOWN = next slide (→), **OK short** = start slideshow (F5 + macOS combos)
+and start the timer, **DOWN long** = exit (Esc) + reset timer.
 
-### 2. PPT remote (Bluetooth HID keyboard)
-1. Open the **PPT 遥控** page (this starts BLE advertising `AI Passport` with keyboard appearance).
-2. Pair it in your OS Bluetooth settings → it becomes a normal keyboard (Windows / macOS / Linux).
-3. Buttons:
-   - **UP** — previous slide (←)
-   - **DOWN** — next slide (→)
-   - **OK (short)** — start slideshow (F5; also macOS combos) + start the presentation timer
-   - **DOWN (long)** — exit slideshow (Esc) + reset the timer
+**Voice input:** open the **语音输入** page → run the PC companion (`companion/`) → hold to speak;
+the transcript is typed into the focused desktop window and shown on screen.
 
-### 3. Voice input
-1. Open the **语音输入** page (advertising `AI Passport Voice` on its own random address,
-   so the desktop keyboard link is not grabbed).
-2. Run the PC companion (see below), hold the PTT key and speak; the transcript is typed
-   into whatever is focused and echoed on-screen.
+**Electronic badge:** home page shows badge fields + avatar; edit via the on-device transfer page
+(`main/transfer_page.c`).
+
+---
+
+## Memory / stack engineering — making voice + PPT coexist
+
+This is the heart of `o-platform`. The ESP32-C3 has no PSRAM and everything runs in a few tens of
+KB of heap, yet provisioning, **voice** and **PPT/HID** all need Bluetooth at once, and Wi-Fi wants
+the same memory. Four things make coexistence work:
+
+### 1. One shared NimBLE stack
+Provisioning, voice and HID run on a **single NimBLE stack** whose lifecycle is owned centrally by
+`main/ble_prov.c`. Donor components must not start their own stack — two stacks would double the
+controller/host footprint and blow the budget. (`ROLE_OBSERVER`/`HOST_BASED_PRIVACY` are disabled to
+save RAM; `ROLE_CENTRAL` stays on because the peripheral must initiate the ATT MTU exchange the voice
+audio needs.)
+
+### 2. Identity isolation per page — so Windows treats voice and the keyboard separately
+Windows decides "this is my keyboard" from **both** the advertising content (appearance + the HID
+`0x1812` UUID) **and the BLE address**. So the two features are isolated on every axis:
+
+| | PPT page | Voice page |
+|---|---|---|
+| Name | `AI Passport` | `AI Passport Voice` |
+| Adv 16-bit UUIDs | `0xA2B0` + `0x1812` | `0xA2B0` only |
+| Appearance | `0x03C1` (keyboard) | `0x0000` (generic) |
+| Address | public | a **derived static-random address** (stable per boot) |
+
+The random voice address is the crucial part: advertising a different address means Windows — which
+bonded the public address as a keyboard — **does not recognize / hijack the voice link**, so the voice
+companion gets a clean GATT connection. (Along the way: `ble_gap_conn_active()` was fixed — it returns
+"am I a connecting master (0/1)", not a connection count — replaced with a self-maintained count;
+`adv_restart` now stops before re-starting so the new identity/address actually takes effect.)
+
+### 3. Two connection slots + re-pairing handled
+`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2` (controller `BLE_MAX_ACT=6`) lets the host's auto-reconnecting
+HID keyboard and the voice companion each hold their own slot. `gap_event_cb` handles
+`BLE_GAP_EVENT_REPEAT_PAIRING` (delete the stale bond, return `RETRY`) so a re-pair after the host
+drops its bond doesn't get silently discarded by NimBLE.
+
+### 4. Wi-Fi is never resident + zero-heap buffers
+- **Wi-Fi → heap for BLE.** Wi-Fi only comes up at boot for SNTP time-sync, then is torn down on
+  sync/timeout (**~99 KB freed**); `show_voice` / `show_ppt` also `wifi_sta_stop()` before starting
+  BLE. If Wi-Fi stayed resident, `NimBLE + esp_hid + the voice GATT service` would fail to start for
+  want of heap → advertising fails → the desktop can't scan.
+- **Zero-heap runtime.** The voice event downlink queue (4×512 B), the CTRL scratch (2 KB), the audio
+  static ring, and the `event_worker` **task stack live in `.bss`** — because `nimble_port_init`
+  (controller) already consumes ~44.7 KB of heap, and allocating another task stack at runtime starves
+  `ble_hs_start` and triggers reboot loops. (The worker stack is sized 4096; 5120 was measured to break
+  BLE start.)
 
 ---
 
 ## Companion tools (PC side)
 
-The voice companion lives in **[`companion/`](companion/)** (ported from
-`zhaohuaxiaoy/folo-ai-passport-voice`):
+`companion/` (ported from the voice donor): `relay.py` (BLE↔ASR relay; `语音中转-relay.bat` /
+`语音助手-GUI.bat`), `probe.py`, `asr_client.py` (Volcano streaming ASR).
 
-- `relay.py` — the BLE↔ASR relay; `语音中转-relay.bat` / `语音助手-GUI.bat` launch it.
-- `probe.py` — quick scan/connect helper.
-- `asr_client.py` — streaming ASR client (Volcano/火山 engine).
-
-Setup:
 ```bash
 cd companion
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
-# put your Volcano ASR key in config.local.json (see config.example.json)
+# put your Volcano ASR key in config.local.json (shape: config.example.json)
 ```
 
-> **Secrets:** the ASR API key goes in `companion/config.local.json`, which is **git-ignored**.
-> Never commit real keys — `config.example.json` shows the shape.
-
----
-
-## Memory / stack engineering for feature coexistence
-
-ESP32-C3 has no PSRAM and the whole thing runs in a few tens of KB of heap. To keep
-provisioning + voice + HID working at the same time:
-
-- **BLE and Wi-Fi contend for the same heap → Wi-Fi is not resident.** At boot Wi-Fi only
-  comes up for SNTP time-sync and is torn down as soon as sync completes or times out
-  (~99 KB freed). `show_voice` / `show_ppt` also stop Wi-Fi before starting the NimBLE stack.
-- **One shared NimBLE stack.** Provisioning, voice and HID all run on a single stack whose
-  lifecycle is owned centrally by `main/ble_prov.c` (donor code must not start a second one).
-- **Zero-heap buffers.** The voice event downlink queue (4×512 B), the CTRL scratch
-  (2 KB), the audio static ring, and the `event_worker` task stack are all **static (.bss)**,
-  because `nimble_port_init` (controller) already consumes ~44.7 KB of heap — allocating
-  those at runtime would starve BLE start and cause reboot loops.
-- **Dual connection slots.** `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2` (controller
-  `BLE_MAX_ACT=6`) so the host's auto-reconnecting HID keyboard and the voice companion can
-  each hold a slot without stealing the other.
+> **Secrets:** the ASR key lives only in `companion/config.local.json`, which is **git-ignored**.
+> Never commit real keys.
 
 ## Status
 
-Development / demo branch. Functional on-device for voice input and PPT control.
-Not an official release.
+Development / demo branch. Voice input and PPT control verified on real hardware. Not an official release.
