@@ -7,51 +7,70 @@ body{font-family:-apple-system,sans-serif;background:#f3f4f6;margin:0;padding:16
 h1{font-size:18px}.card{background:#fff;border-radius:12px;padding:14px;margin:12px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 label{display:block;font-size:13px;font-weight:600;margin:8px 0 4px}
 input[type=text]{width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:15px}
-.row{display:flex;gap:8px;align-items:center;margin-top:4px}
-.row select{flex:1;padding:6px;border:1px solid #ddd;border-radius:6px}
+.row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.row select{padding:6px;border:1px solid #ddd;border-radius:6px}
 input[type=color]{width:44px;height:34px;border:1px solid #ddd;border-radius:6px;padding:2px}
 .chk{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:normal}
 .btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-size:16px;margin-top:14px}
-.hint{font-size:12px;color:#777}.status{font-size:14px;margin-top:10px;min-height:18px}
+.hint{font-size:12px;color:#777;margin-top:6px}
 </style></head><body>
-<h1>AI Passport · 工牌字段传输</h1>
-<div class="card">
-  <label>昵称（大字，留空显示默认）</label>
-  <input type="text" id="v_nickname" placeholder="昵称">
-  <div class="row"><label class="chk"><input type="color" id="c_nickname" value="#ffffff"> 颜色</label>
-    <label class="chk"><input type="checkbox" id="b_nickname" checked> 粗体</label></div>
-</div>
-<div class="card" id="lines"></div>
-<div class="card">
-  <label>静态头像（PNG/JPG，自动裁剪为 102×140；上传后主页自动切到静态照片）</label>
+<h1>AI Passport · 工牌传输</h1>
+
+<!-- 主表单：原生 POST，任何 webview 都能提交，不依赖 JS -->
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <div class="card">
+    <label>昵称（大字，留空=默认）</label>
+    <input type="text" name="nickname" placeholder="昵称">
+    <div class="row"><label class="chk"><input type="color" name="nickname_color" value="#ffffff"> 颜色</label>
+      <label class="chk"><input type="checkbox" name="nickname_bold" value="1"> 粗体</label></div>
+    <input type="hidden" name="nickname_sz" value="24">
+  </div>
+
+  <div class="card">
+    <label>第 2 行（标签可自定义；内容留空=整行不显示）</label>
+    <input type="text" name="college_label" placeholder="标签，如 学院/部门">
+    <input type="text" name="college" placeholder="内容">
+    <div class="row"><select name="college_sz"><option value="14">14px</option><option value="24">24px</option></select>
+      <label class="chk"><input type="color" name="college_color" value="#cccccc"> 色</label>
+      <label class="chk"><input type="checkbox" name="college_bold" value="1"> 粗</label></div>
+  </div>
+  <div class="card">
+    <label>第 3 行</label>
+    <input type="text" name="major_label" placeholder="标签">
+    <input type="text" name="major" placeholder="内容">
+    <div class="row"><select name="major_sz"><option value="14">14px</option><option value="24">24px</option></select>
+      <label class="chk"><input type="color" name="major_color" value="#cccccc"> 色</label>
+      <label class="chk"><input type="checkbox" name="major_bold" value="1"> 粗</label></div>
+  </div>
+  <div class="card">
+    <label>第 4 行</label>
+    <input type="text" name="student_id_label" placeholder="标签">
+    <input type="text" name="student_id" placeholder="内容">
+    <div class="row"><select name="student_id_sz"><option value="14">14px</option><option value="24">24px</option></select>
+      <label class="chk"><input type="color" name="student_id_color" value="#888888"> 色</label>
+      <label class="chk"><input type="checkbox" name="student_id_bold" value="1"> 粗</label></div>
+  </div>
+
+  <div class="card">
+    <label>头像显示</label>
+    <div class="row"><label class="chk"><input type="radio" name="avatar_mode" value="pet" checked> 动态人物</label>
+      <label class="chk"><input type="radio" name="avatar_mode" value="photo"> 静态照片</label></div>
+    <div class="hint">选“静态照片”前请先用下方“上传头像”。（回主页即生效）</div>
+  </div>
+
+  <button class="btn" type="submit">保存到设备</button>
+</form>
+
+<div class="card" style="margin-top:16px">
+  <label>上传静态头像（需能跑 JS 的浏览器，如 Chrome 打开 http://192.168.4.1/）</label>
   <input type="file" id="avatar" accept="image/*">
-  <div class="hint" id="avatarMeta">未选择（不改头像）</div>
+  <button class="btn" type="button" onclick="sendAvatar()" style="background:#059669">转换并上传头像</button>
+  <div class="hint" id="avatarMeta">选图后自动裁成 102×140 RGB565 上传，并自动切到“静态照片”。</div>
 </div>
-<div class="card">
-  <label class="chk"><input type="checkbox" id="useStatic"> 使用静态照片（关=动态头像）</label>
-  <div class="hint">上传头像会自动勾选；取消勾选则主页显示动态人物。</div>
-</div>
-<button class="btn" onclick="send()">发送到设备</button>
-<div class="status" id="status"></div>
+
 <script>
-var SEC=[{k:'college',ph:'学院/单位',def:'学院'},{k:'major',ph:'专业/职务',def:'专业'},{k:'student_id',ph:'学号/编号',def:'学号'}];
-var L=document.getElementById('lines');
-SEC.forEach(function(f){
-  var d=document.createElement('div');
-  d.innerHTML='<label>标签（显示为“标签:值”，可自定义，留空则不显示此行内容时隐藏整行）</label>'+
-    '<input type="text" id="L_'+f.k+'" placeholder="'+f.def+'">'+
-    '<label>内容</label><input type="text" id="V_'+f.k+'" placeholder="'+f.ph+'">'+
-    '<div class="row"><select id="S_'+f.k+'"><option value="14">14px</option><option value="24">24px</option></select>'+
-    '<label class="chk"><input type="color" id="C_'+f.k+'" value="#cccccc"> 色</label>'+
-    '<label class="chk"><input type="checkbox" id="B_'+f.k+'> 粗</label></div>';
-  L.appendChild(d);
-});
-function load(){fetch('/fields').then(function(r){return r.json();}).then(function(j){
-  if(j.nickname) document.getElementById('v_nickname').value=j.nickname;
-  SEC.forEach(function(f){var v=j[f.k+'_label']||j[f.k];if(v)document.getElementById('V_'+f.k).value=j[f.k]||'';});
-}).catch(function(){});}
-load();
-function pickAvatar(i){var f=i.files[0];if(!f){avatarData=null;return;}
+var avatarData=null;
+function pick(i){var f=i.files[0];if(!f){avatarData=null;return;}
   var img=new Image();img.onload=function(){
     var W=102,H=140,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
     var s=Math.max(W/img.width,H/img.height),dw=img.width*s,dh=img.height*s;
@@ -59,28 +78,14 @@ function pickAvatar(i){var f=i.files[0];if(!f){avatarData=null;return;}
     var id=x.getImageData(0,0,W,H).data,out=new Uint8Array(W*H*2);
     for(var p=0,q=0;p<W*H;p++){var r=id[p*4],g=id[p*4+1],b=id[p*4+2];
       var v=((r&0xF8)<<8)|((g&0xFC)<<3)|(b>>3);out[q++]=v&0xFF;out[q++]=v>>8;}
-    avatarData=out;document.getElementById('avatarMeta').textContent='已就绪 '+W+'×'+H;
-    document.getElementById('useStatic').checked=true;
+    avatarData=out;document.getElementById('avatarMeta').textContent='已就绪 '+W+'×'+H+'，点“转换并上传头像”';
   };img.src=URL.createObjectURL(f);}
-document.getElementById('avatar').onchange=function(e){pickAvatar(e.target);};
-var avatarData=null;
-function send(){var fd=new FormData();
-  fd.append('nickname',document.getElementById('v_nickname').value);
-  fd.append('nickname_color',hex2(document.getElementById('c_nickname').value));
-  fd.append('nickname_bold',document.getElementById('b_nickname').checked?'1':'0');
-  fd.append('nickname_sz','24');
-  SEC.forEach(function(f){
-    fd.append(f.k,document.getElementById('V_'+f.k).value);
-    fd.append(f.k+'_label',document.getElementById('L_'+f.k).value);
-    fd.append(f.k+'_sz',document.getElementById('S_'+f.k).value);
-    fd.append(f.k+'_color',hex2(document.getElementById('C_'+f.k).value));
-    fd.append(f.k+'_bold',document.getElementById('B_'+f.k).checked?'1':'0');
-  });
-  fd.append('avatar_mode',document.getElementById('useStatic').checked?'photo':'pet');
-  if(avatarData)fd.append('avatar',new Blob([avatarData],{type:'application/octet-stream'}),'avatar.raw');
-  document.getElementById('status').textContent='发送中…';
-  fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.text();}).then(function(t){
-    document.getElementById('status').textContent='完成，回设备主页查看';}).catch(function(e){
-    document.getElementById('status').textContent='失败:'+e;});}
-function hex2(h){return h.replace('#','');}
+document.getElementById('avatar').onchange=function(e){pick(e.target);};
+function sendAvatar(){if(!avatarData){document.getElementById('avatarMeta').textContent='先选一张图';return;}
+  var fd=new FormData();fd.append('avatar',new Blob([avatarData],{type:'application/octet-stream'}),'avatar.raw');
+  fd.append('avatar_mode','photo');
+  document.getElementById('avatarMeta').textContent='头像上传中…';
+  fetch('/upload',{method:'POST',body:fd}).then(function(r){return r.text();})
+   .then(function(){document.getElementById('avatarMeta').textContent='头像已传，主页切到静态照片';})
+   .catch(function(e){document.getElementById('avatarMeta').textContent='失败(请用Chrome打开本地址):'+e;});}
 </script></body></html>

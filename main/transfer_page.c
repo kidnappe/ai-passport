@@ -19,6 +19,22 @@
 extern const char transfer_editor_html_start[] asm("_binary_transfer_editor_html_start");
 extern const char transfer_editor_html_end[]   asm("_binary_transfer_editor_html_end");
 
+/* 保存成功页：绿色圆圈打勾 ✓，风格对齐配网完成页(wifi_configuration_done.html) */
+static const char UPLOAD_OK_HTML[] =
+"<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>保存成功</title>"
+"<style>body{font-family:-apple-system,sans-serif;background:#f3f4f6;color:#111;display:flex;"
+"height:100vh;margin:0;align-items:center;justify-content:center}"
+"@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}"
+".c{text-align:center}.ok{width:64px;height:64px}"
+"p{font-size:19px;margin-top:12px}small{color:#888;font-size:13px}</style></head>"
+"<body><div class=c>"
+"<svg class=ok viewBox=\"0 0 52 52\">"
+"<circle cx=\"26\" cy=\"26\" r=\"25\" fill=\"none\" stroke=\"#16a34a\" stroke-width=\"2\"/>"
+"<path d=\"M14.1 27.2l7.1 7.2 16.7-16.8\" fill=\"none\" stroke=\"#16a34a\" stroke-width=\"3\" "
+"stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+"<p>保存成功</p><br><small>可关闭此页，返回设备主页查看</small></div></body></html>";
+
 static const char *TAG = "transfer";
 
 static void set_dyn_flag(bool dyn) {   /* 与 main.c 同一命名空间 pass_net / key "dyn" */
@@ -101,9 +117,23 @@ static esp_err_t handle_captive(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* 未注册路径(手机各类 captive 探测如 /mmtls*、/generate_204、/ncsi.txt…)→ 302 到编辑页,
+ * 让任何手机的门户探测都能被兜住 → 自动弹页。*/
+static esp_err_t httpd_404_redirect(httpd_req_t *req, httpd_err_code_t err)
+{
+    (void)err;
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 /* 根路径直接返回内嵌编辑页：手机/电脑连上设备热点后开 http://192.168.4.1/ 即可 */
 static esp_err_t handle_index(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "GET / (编辑页) 命中");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_send(req, transfer_editor_html_start,
                     transfer_editor_html_end - transfer_editor_html_start);
@@ -162,6 +192,7 @@ static void save_field(const char *path, const char *data, size_t len)
 
 static esp_err_t handle_post_upload(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "POST /upload 到达, content_len=%d", req->content_len);
     char buf[1024];
     char boundary[64] = {0};
     int remaining = req->content_len;
@@ -314,13 +345,13 @@ static esp_err_t handle_post_upload(httpd_req_t *req)
         }
     }
 
-    httpd_resp_set_type(req, "text/plain; charset=utf-8");
-    httpd_resp_sendstr(req, "OK");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_sendstr(req, UPLOAD_OK_HTML);
     ESP_LOGI(TAG, "Upload complete");
 
     /* httpd 线程无权直接碰 LVGL：必须持锁，否则与渲染任务并发会刷死在重绘链表 */
     if (s_status && bsp_lvgl_lock(1000)) {
-        passport_ui_label_set_text(s_status, "传输完成，返回主页查看");
+        passport_ui_label_set_text(s_status, "✓ 保存成功，返回主页查看");
         bsp_lvgl_unlock();
     }
     return ESP_OK;
@@ -333,7 +364,7 @@ static void start_http_server(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
     config.max_uri_handlers = 20;
-    config.stack_size = 4096;
+    config.stack_size = 8192;
     config.server_port = 80;
 
     if (httpd_start(&s_server, &config) != ESP_OK) {
@@ -367,6 +398,8 @@ static void start_http_server(void)
             .uri = captive_urls[i], .method = HTTP_GET, .handler = handle_captive
         });
     }
+    /* 任何未匹配路径(含未知 captive 探测) → 302 编辑页, 保证各品牌手机都能自动弹 */
+    httpd_register_err_handler(s_server, HTTPD_404_NOT_FOUND, httpd_404_redirect);
 
     s_server_running = true;
     ESP_LOGI(TAG, "HTTP server started on port 80");
