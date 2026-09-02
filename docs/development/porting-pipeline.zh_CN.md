@@ -9,7 +9,7 @@
 | 外部项目 | 角色 | 与 o-platform 的关系 |
 | --- | --- | --- |
 | [rvaim/ai-passport](https://github.com/rvaim/ai-passport)（`references/passport-platform`） | **底座**：插件化平台（.pap 包 / BLE 安装 / Lua 运行时 / passport_core·ui·link·runtime） | o-platform 的基线，按 fork-guide 工作流维护（main 同步上游，功能走 `feature/*`） |
-| [killhello/ai-pass-port-wifi](https://github.com/killhello/ai-pass-port-wifi)（`references/wifi-provision`） | **移植案例①**：配网 | 保留交互协议重写为 `o-platform/main/ble_prov.c` + `docs/guides/ble_provisioning.html` |
+| [killhello/ai-pass-port-wifi](https://github.com/killhello/ai-pass-port-wifi)（`references/wifi-provision`） | **移植案例①**：配网（早期 BLE，后被小智热点配网取代） | 保留交互协议重写为 `o-platform/main/ble_prov.c` + `docs/guides/ble_provisioning.html`；**现行配网已改为小智热点配网 [`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect)（`components/passport_wifi_ap/`），见 `plan-ble-hotspot-provisioning.zh_CN.md`** |
 | [zhaohuaxiaoy/folo-ai-passport-voice](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | **移植案例②**：语音输入（MIT） | 按本平台分层重组为 `components/passport_voice`（PTT→16kHz ADPCM→BLE 0xA2B0→桌面 companion→火山流式 ASR） |
 | [FoloToy/ai-passport](https://github.com/FoloToy/ai-passport)（`references/ai-passport`） | **UI 风格参考**（非功能移植源） | 像素风视觉语言（ui_pixel 配色/组件）被 o-platform UI 借鉴；该克隆内的 volume-cop / emotion-ball 是在官方源码上做的**本地实验**，不属于"移植他人固件" |
 
@@ -133,7 +133,7 @@ idf.py flash monitor                                        # 门禁3: 上真机
 | 案例 | donor | 走到的阶段 | 关键做法 | 证据 |
 | --- | --- | --- | --- | --- |
 | 底座 fork | rvaim/ai-passport | 0→5（持续） | fork-guide：main 同步上游、功能走 feature/* | `o-platform/` 全仓 |
-| ① 配网 | killhello/ai-pass-port-wifi | 0→1→3→4→5 | 保留交互协议+伴生网页，代码按本平台重写 | `main/ble_prov.c`、`docs/guides/ble_provisioning.html` |
+| ① 配网（早期 BLE，后被小智热点配网取代） | killhello/ai-pass-port-wifi | 0→1→3→4→5 | 保留交互协议+伴生网页，代码按本平台重写 | `main/ble_prov.c`、`docs/guides/ble_provisioning.html` |
 | ② 语音输入 | zhaohuaxiaoy/folo-ai-passport-voice (MIT) | 0→1→3→4→5 | **按平台分层归位**（link/voice/main 三层拆解）、伴生 companion 独立交付 | `components/passport_voice/`（出处注释在 passport_voice.h、voice_ble.c） |
 | （旁证）桌面验证技术 | FoloToy 官方源码上的本地实验 | 仅阶段 2 工具预演 | 单源双编译、SDL spike、QEMU 引导 | `projects/volume-cop/`、`projects/emotion-ball-proto/`、`build_qemu/` |
 

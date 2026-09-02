@@ -11,7 +11,7 @@
 | 项 | 决定 |
 |---|---|
 | 最终固件定位 | **纯 BLE 语音，无小智**（回到 8-30 BLE 时代功能） |
-| 配网方式 | BLE 配网 → **热点配网**（softAP + HTTP captive portal） |
+| 配网方式 | ① 早期 **BLE 配网**（移植自 [`killhello/ai-pass-port-wifi`](https://github.com/killhello/ai-pass-port-wifi)）→ ② 现行 **热点配网**（移植自 小智 [`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect)，softAP + HTTP captive portal） |
 | 保留 | **开机自启 WiFi**（自动连已保存网络 + 掉线重连） |
 | 保留 | BLE 语音通道（GATT 0xA2B0 语音对话） |
 | 热点组件 | **复用当前已验证的 `components/passport_wifi_ap`** |
