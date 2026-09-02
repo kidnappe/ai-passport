@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Passport 电子工牌配置</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#f5f5f5;padding:20px}
+.container{max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;gap:24px}
+.form-section{flex:1;min-width:320px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.preview-section{flex:0 0 auto}
+h1{font-size:20px;margin-bottom:20px;color:#333}
+h2{font-size:16px;margin-bottom:12px;color:#666;text-align:center}
+.field-group{margin-bottom:14px}
+.field-group label{display:block;font-size:13px;font-weight:bold;color:#555;margin-bottom:4px}
+.field-group .row{display:flex;gap:8px;align-items:center}
+.field-group input[type=text]{padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;outline:0}
+.field-group input[type=text]:focus{border-color:#4CAF50}
+.field-group select{padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:#fff;outline:0}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-top:8px;text-align:center}
+.btn-primary{background:#4CAF50;color:#fff}
+.btn-primary:hover{background:#45a049}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed}
+.btn-secondary{background:#2196F3;color:#fff;margin-top:4px}
+.btn-secondary:hover{background:#1976D2}
+.file-group{margin:16px 0}
+.file-group label{display:block;font-size:13px;font-weight:bold;color:#555;margin-bottom:4px}
+.file-group .hint{font-weight:normal;color:#888;font-size:12px;margin-bottom:6px}
+.file-group input[type=file]{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:#fff}
+.file-actions{display:flex;gap:8px;margin-top:6px;align-items:center}
+.file-actions .meta{font-size:12px;color:#666}
+.file-actions button{padding:6px 12px;border:1px solid #ddd;background:#fff;border-radius:6px;font-size:12px;cursor:pointer}
+.file-actions button:hover{border-color:#c62828;color:#c62828}
+
+/* 设备外框：外框 252x332，6px 内边距 → 屏幕 240x320 = 状态栏 28 + 内容 220 + 底栏 72 */
+.device-frame{width:252px;height:332px;background:#1a1a1a;border-radius:16px;padding:6px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.device-screen{width:240px;height:320px;background:#0d0d0d;border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+.status-bar{height:28px;background:#111111;border-bottom:1px solid #222222;display:flex;align-items:center;padding:0 10px;color:#fff;font-size:11px;flex-shrink:0;gap:4px}
+.status-bar .time{color:#fff;font-weight:bold}
+.status-bar .weekday{color:#888;margin-right:auto}
+.status-bar .icons{display:flex;gap:6px;color:#888}
+.status-bar .icons .on{color:#fff}
+.content-area{flex:1;display:flex;align-items:stretch;min-height:0;position:relative}
+/* 头像：x=0, y=0, 102x140，下边界与学号字段下边界齐平（与固件 show_home() 一致） */
+.avatar-area{position:absolute;left:0;top:0;width:102px;height:140px;border:1px solid #333;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#555;font-size:14px;overflow:hidden;background-size:100% 100%;background-repeat:no-repeat}
+/* 文本区：x=102, 宽 240-102-3=135，右对齐留 3px，单行不折行（与固件 LV_LABEL_LONG_DOT 一致） */
+.info-area{position:absolute;left:102px;top:0;width:135px;height:220px}
+.info-area .field{position:static;display:block;margin:0 0 10px 0;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;max-width:135px}
+.info-area .field:first-child{margin-top:12px}
+.bottom-bar{height:72px;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 10px;background:#111111;border-top:1px solid #222222}
+.bottom-btn{flex:1;height:44px;border:1px solid #4CAF50;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;gap:6px}
+.bottom-btn .icon{color:#4CAF50;font-size:16px}
+.ip-input{display:flex;gap:8px;margin-bottom:16px}
+.ip-input input{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;outline:0;font-family:monospace}
+.ip-input input:focus{border-color:#2196F3}
+.status{text-align:center;padding:10px;border-radius:6px;margin-top:8px;font-size:14px;display:none}
+.status.success{display:block;background:#e8f5e9;color:#2e7d32}
+.status.error{display:block;background:#ffebee;color:#c62828}
+.status.info{display:block;background:#e3f2fd;color:#1565c0}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="form-section">
+<h1>电子工牌配置</h1>
+<div class="ip-input">
+<input type="text" id="deviceIp" placeholder="设备IP, 如 192.168.1.100" value="192.168.4.1">
+<button class="btn btn-secondary" onclick="testConn()" style="width:auto;padding:8px 16px;margin:0">检测</button>
+</div>
+
+<div class="field-group"><label>昵称</label>
+<div class="row">
+<input type="text" id="f_nickname" oninput="up()" placeholder="输入昵称" style="flex:2">
+<select id="s_nickname" onchange="up()" style="width:50px" title="昵称固定 24px（「周旋」已收入 24px 字库，其他字符回退 14px）">
+<option value="24" selected>24</option>
+</select>
+<input type="color" id="c_nickname" value="#ffffff" onchange="up()" style="width:32px;height:32px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer">
+<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+<input type="checkbox" id="b_nickname" checked onchange="up()">粗</label>
+</div></div>
+
+<div class="field-group"><label>学院</label>
+<div class="row">
+<input type="text" id="f_college" oninput="up()" placeholder="输入学院" style="flex:2">
+<select id="s_college" onchange="up()" style="width:50px" title="固件只有 14px / 24px 两档字库">
+<option value="14" selected>14</option><option value="24">24</option>
+</select>
+<input type="color" id="c_college" value="#cccccc" onchange="up()" style="width:32px;height:32px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer">
+<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+<input type="checkbox" id="b_college" onchange="up()">粗</label>
+</div></div>
+
+<div class="field-group"><label>专业</label>
+<div class="row">
+<input type="text" id="f_major" oninput="up()" placeholder="输入专业" style="flex:2">
+<select id="s_major" onchange="up()" style="width:50px" title="固件只有 14px / 24px 两档字库">
+<option value="14" selected>14</option><option value="24">24</option>
+</select>
+<input type="color" id="c_major" value="#cccccc" onchange="up()" style="width:32px;height:32px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer">
+<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+<input type="checkbox" id="b_major" onchange="up()">粗</label>
+</div></div>
+
+<div class="field-group"><label>学号</label>
+<div class="row">
+<input type="text" id="f_student_id" oninput="up()" placeholder="输入学号" style="flex:2">
+<select id="s_student_id" onchange="up()" style="width:50px" title="固件只有 14px / 24px 两档字库">
+<option value="14" selected>14</option><option value="24">24</option>
+</select>
+<input type="color" id="c_student_id" value="#888888" onchange="up()" style="width:32px;height:32px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer">
+<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+<input type="checkbox" id="b_student_id" onchange="up()">粗</label>
+</div></div>
+
+<div class="field-group"><label>小智 WebSocket 地址</label>
+<div class="row">
+<input type="text" id="f_xiaozhi_url" placeholder="wss://xxx" style="flex:2">
+</div>
+<div class="hint">留空则设备走 OTA 激活流程自动获取；手工填地址必须同时填 token，否则服务器拒绝握手。</div></div>
+
+<div class="field-group"><label>小智 WebSocket Token</label>
+<div class="row">
+<input type="text" id="f_xiaozhi_token" placeholder="Bearer token" style="flex:2">
+</div></div>
+
+<div class="file-group">
+<label>头像</label>
+<div class="hint">支持 PNG / JPG / WEBP，自动居中裁剪缩放到 102×140 并转成 RGB565；已是 .raw 则原样上传</div>
+<input type="file" id="f_avatar" accept="image/*,.raw" onchange="pickAvatar(this)">
+<div class="file-actions">
+<span class="meta" id="avatarMeta">未选择（不修改设备头像）</span>
+<button type="button" onclick="clearAvatar()" style="display:none" id="avatarClear">清除</button>
+</div>
+</div>
+
+<button class="btn btn-primary" id="sendBtn" onclick="sendToDevice()">传输到设备</button>
+<div id="status" class="status"></div>
+</div>
+
+<div class="preview-section">
+<h2>设备预览</h2>
+<div class="device-frame"><div class="device-screen">
+<div class="status-bar"><span class="time">12:34</span><span class="weekday">MON</span>
+<span class="icons"><span>&#xe288;</span><span>&#xef87;</span><span class="on">&#xef89; 80%</span></span></div>
+<div class="content-area">
+<div class="avatar-area" id="avatarBox">头像</div>
+<div class="info-area">
+<div class="field" id="p_nickname" style="color:#fff;font-size:24px;font-weight:bold">o-Platform</div>
+<div class="field" id="p_college" style="color:#ccc;font-size:14px">学院:</div>
+<div class="field" id="p_major" style="color:#ccc;font-size:14px">专业:</div>
+<div class="field" id="p_student_id" style="color:#888;font-size:14px">学号:</div>
+</div></div>
+<div class="bottom-bar"><div class="bottom-btn"><span class="icon">&#xef83;</span>插件</div>
+<div class="bottom-btn"><span class="icon">&#xef80;</span>设置</div></div>
+</div></div>
+</div></div>
+
+<script>
+/* 设备头像尺寸，与固件 show_home() 中的 img_w / img_h 保持一致 */
+var AVATAR_W = 102, AVATAR_H = 140;
+var FIELDS = ['nickname', 'college', 'major', 'student_id'];
+/* 小智的连接参数是配置而不是工牌字段：不进预览，也没有字号/颜色/粗体。
+ * 混进 FIELDS 会让 sendToDevice 去取不存在的 s_/c_/b_ 元素而抛异常，整次上传失败。 */
+var CONFIG_FIELDS = ['xiaozhi_url', 'xiaozhi_token'];
+/* 除昵称外的字段在设备上渲染为「标签:值」，预览保持一致 */
+var FIELD_LABELS = {college: '学院', major: '专业', student_id: '学号'};
+var sAvatar = null;   /* Uint8Array，RGB565 小端 */
+
+function up() {
+  FIELDS.forEach(function(n) {
+    var el = document.getElementById('p_' + n);
+    var v = document.getElementById('f_' + n).value;
+    var label = FIELD_LABELS[n] || '';
+    el.textContent = label ? label + ':' + v : (v || 'o-Platform');
+    el.style.fontSize = document.getElementById('s_' + n).value + 'px';
+    el.style.color = document.getElementById('c_' + n).value;
+    el.style.fontWeight = document.getElementById('b_' + n).checked ? 'bold' : 'normal';
+  });
+}
+
+/* RGBA → RGB565 小端（LVGL 原生字节序，bsp_display_lvgl 会再交换给 SPI） */
+function rgbaToRGB565(data) {
+  var out = new Uint8Array(AVATAR_W * AVATAR_H * 2);
+  for (var i = 0, p = 0; p < out.length; i += 4, p += 2) {
+    var r = data[i], g = data[i + 1], b = data[i + 2];
+    var v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+    out[p] = v & 0xFF;
+    out[p + 1] = (v >> 8) & 0xFF;
+  }
+  return out;
+}
+
+/* RGB565 小端 → PNG data URL，用于预览 */
+function rgb565ToDataURL(u8) {
+  var c = document.createElement('canvas');
+  c.width = AVATAR_W; c.height = AVATAR_H;
+  var ctx = c.getContext('2d');
+  var id = ctx.createImageData(AVATAR_W, AVATAR_H);
+  for (var i = 0, p = 0; i < u8.length; i += 2, p += 4) {
+    var v = u8[i] | (u8[i + 1] << 8);
+    var r = (v >> 11) & 0x1F, g = (v >> 5) & 0x3F, b = v & 0x1F;
+    id.data[p]     = (r << 3) | (r >> 2);
+    id.data[p + 1] = (g << 2) | (g >> 4);
+    id.data[p + 2] = (b << 3) | (b >> 2);
+    id.data[p + 3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  return c.toDataURL('image/png');
+}
+
+function showAvatar(u8, meta) {
+  sAvatar = u8;
+  var box = document.getElementById('avatarBox');
+  box.textContent = '';
+  box.style.backgroundImage = 'url(' + rgb565ToDataURL(u8) + ')';
+  document.getElementById('avatarMeta').textContent = meta;
+  document.getElementById('avatarClear').style.display = '';
+}
+
+function clearAvatar() {
+  sAvatar = null;
+  document.getElementById('f_avatar').value = '';
+  var box = document.getElementById('avatarBox');
+  box.style.backgroundImage = '';
+  box.textContent = '头像';
+  document.getElementById('avatarMeta').textContent = '未选择（不修改设备头像）';
+  document.getElementById('avatarClear').style.display = 'none';
+}
+
+function pickAvatar(input) {
+  var f = input.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+
+  /* 已经是 .raw：校验尺寸后原样上传 */
+  if (/\.raw$/i.test(f.name)) {
+    reader.onload = function() {
+      var u8 = new Uint8Array(reader.result);
+      var want = AVATAR_W * AVATAR_H * 2;
+      if (u8.length !== want) {
+        setStatus('raw 文件必须是 ' + want + ' 字节（' + AVATAR_W + '×' + AVATAR_H + ' RGB565），实际 ' + u8.length + ' 字节', 'error');
+        clearAvatar();
+        return;
+      }
+      showAvatar(u8, f.name + ' · ' + u8.length + ' 字节');
+    };
+    reader.readAsArrayBuffer(f);
+    return;
+  }
+
+  /* 其它图片：解码 → 居中裁剪铺满 → RGB565 */
+  reader.onload = function() {
+    var img = new Image();
+    img.onload = function() {
+      var c = document.createElement('canvas');
+      c.width = AVATAR_W; c.height = AVATAR_H;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, AVATAR_W, AVATAR_H);
+      var scale = Math.max(AVATAR_W / img.width, AVATAR_H / img.height);
+      var dw = img.width * scale, dh = img.height * scale;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (AVATAR_W - dw) / 2, (AVATAR_H - dh) / 2, dw, dh);
+      var u8 = rgbaToRGB565(ctx.getImageData(0, 0, AVATAR_W, AVATAR_H).data);
+      showAvatar(u8, img.width + '×' + img.height + ' → 148×220 · ' + u8.length + ' 字节');
+    };
+    img.onerror = function() { setStatus('图片解码失败，换一张试试', 'error'); clearAvatar(); };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function setStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
+
+function testConn() {
+  var ip = document.getElementById('deviceIp').value.trim();
+  if (!ip) return;
+  setStatus('检测 ' + ip + ' ...', 'info');
+  var x = new XMLHttpRequest();
+  x.open('GET', 'http://' + ip + '/ping', true);
+  x.timeout = 3000;
+  x.onload = function() { setStatus('已连接 ' + ip, 'success'); };
+  x.onerror = function() { setStatus('无法连接 ' + ip, 'error'); };
+  x.ontimeout = function() { setStatus('检测超时 ' + ip, 'error'); };
+  x.send();
+}
+
+function sendToDevice() {
+  var ip = document.getElementById('deviceIp').value.trim();
+  if (!ip) { setStatus('请输入设备IP', 'error'); return; }
+  var btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  btn.textContent = '传输中...';
+  setStatus('正在传输...', 'info');
+
+  var fd = new FormData();
+  FIELDS.forEach(function(n) {
+    var v = document.getElementById('f_' + n).value;
+    var sz = document.getElementById('s_' + n).value;
+    var c = document.getElementById('c_' + n).value.replace('#', '');
+    var b = document.getElementById('b_' + n).checked ? '1' : '0';
+    if (v) fd.append(n, v);
+    fd.append(n + '_sz', sz);
+    fd.append(n + '_color', c);
+    fd.append(n + '_bold', b);
+  });
+  CONFIG_FIELDS.forEach(function(n) {
+    var v = document.getElementById('f_' + n).value.trim();
+    if (v) fd.append(n, v);
+  });
+  if (sAvatar) fd.append('avatar', new Blob([sAvatar], { type: 'application/octet-stream' }), 'avatar.raw');
+
+  var x = new XMLHttpRequest();
+  x.open('POST', 'http://' + ip + '/upload', true);
+  x.timeout = 30000;
+  var done = function(msg, type) {
+    btn.disabled = false;
+    btn.textContent = '传输到设备';
+    setStatus(msg, type);
+  };
+  x.onload = function() {
+    if (x.status === 200) done('传输完成！返回主页即可看到新工牌', 'success');
+    else done('失败: HTTP ' + x.status, 'error');
+  };
+  x.onerror = function() { done('无法连接设备', 'error'); };
+  x.ontimeout = function() { done('传输超时', 'error'); };
+  x.send(fd);
+}
+</script>
+</body>
+</html>

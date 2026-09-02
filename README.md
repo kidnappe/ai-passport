@@ -149,6 +149,23 @@ powershell .\tools\build.ps1 -Flash
 Full walkthrough (naming contract, motion presets, pitfalls):
 [`docs/development/human-slicing-guide.zh_CN.md`](docs/development/human-slicing-guide.zh_CN.md).
 
+## Customising the badge fields
+
+The home screen has four editable fields — **nickname / college / major / student id** — each with
+its own **text, font size (14/24), colour and bold**, plus an optional **static photo** (`avatar.raw`).
+
+To edit (device and PC on the **same Wi-Fi**):
+1. Open the on-device **传输 (Transfer)** page — the screen shows the device's LAN IP
+   (`192.168.4.1` in AP-provisioning mode).
+2. In a browser, open **`tools/transfer.html`** and type that IP into the "Device IP" box.
+3. Edit the four fields (size/colour/bold) and the avatar, then upload — **back on the device's
+   home screen it applies immediately**, no reboot.
+
+Fields are stored at `/passport/{name}.txt` (+ `_sz/_color/_bold.txt`) and the photo at
+`/passport/avatar.raw`.
+> Note: the CJK font has only **14px/24px** sizes and is a **GB2312 common-character subset**; rare
+> characters render blank.
+
 ## Status
 
 Development / demo branch. Voice input and PPT control verified on real hardware. Not an official release.

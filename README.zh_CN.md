@@ -133,6 +133,18 @@ powershell .\tools\build.ps1 -Flash
 完整说明（命名契约、运动预设、常见坑）见
 [`docs/development/human-slicing-guide.zh_CN.md`](docs/development/human-slicing-guide.zh_CN.md)。
 
+## 自定义电子工牌字段（可定义字段）
+
+主页工牌有四个可自定义字段——**昵称 / 学院 / 专业 / 学号**，每个可单独设**文字、字号（14/24）、颜色、是否粗体**，另可传一张**静态头像照片**（`avatar.raw`）。
+
+改法（设备与电脑连**同一 WiFi**）：
+1. 设备进「传输」页，屏幕会显示设备的**局域网 IP**（AP 配网模式下默认 `192.168.4.1`）。
+2. 电脑浏览器打开 **`tools/transfer.html`**，顶部「设备 IP」填上一步的地址。
+3. 编辑四个字段（含字号/颜色/粗体）与头像 → 点上传 → **回设备主页即生效**，无需重启。
+
+字段存于 `/passport/{名}.txt` 及 `{名}_sz/_color/_bold.txt`、头像 `/passport/avatar.raw`。
+> 注意：中文字库只有 **14px/24px 两档**、且为 **GB2312 常用字子集**，字库外的生僻字会显示为空白。
+
 ## 状态
 
 开发 / 演示分支。语音输入与 PPT 控制已在真机走通，非正式发布。
