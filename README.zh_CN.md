@@ -27,7 +27,7 @@ donor 代码**按本平台分层重组、并非整仓搬运**，且文件头保�
 | **Wi‑Fi 配网** | 最终采用**小智的热点配网**：[`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect)（softAP + captive portal） | MIT | `components/passport_wifi_ap/`（早期 BLE 配网 `main/ble_prov.c` 已重构为热点配网） |
 | **语音输入** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | `components/passport_voice/` + PC 端 `companion/` |
 | **PPT 遥控** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | 经官方 `esp_hid` 组件，落在 `components/passport_ppt/` |
-| **主页动态头像** | 底座 [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport) 的 `pet` 精灵引擎，改名重组为 `human_display`（`pet_*`→`human_*`） | — | `components/human_display/`，帧编译进固件；素材用 LPC 生成器出表→`tools/lpc2pet.py` 切→`tools/prep_pet.py` 转换 |
+| **主页动态头像** | [`WhiteMagic2014/ai-passport`](https://github.com/WhiteMagic2014/ai-passport) 的 `pet` 精灵引擎，改名重组为 `human_display`（`pet_*`→`human_*`） | — | `components/human_display/`，帧编译进固件；素材用 LPC 生成器出表→`tools/lpc2pet.py` 切→`tools/prep_pet.py` 转换 |
 
 ---
 
