@@ -9,11 +9,25 @@
 #include "esp_netif.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/err.h"
+#include "nvs.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+/* 内嵌的设备端编辑页（main/CMakeLists.txt EMBED_TXTFILES 注入） */
+extern const char transfer_editor_html_start[] asm("_binary_transfer_editor_html_start");
+extern const char transfer_editor_html_end[]   asm("_binary_transfer_editor_html_end");
+
 static const char *TAG = "transfer";
+
+static void set_dyn_flag(bool dyn) {   /* 与 main.c 同一命名空间 pass_net / key "dyn" */
+    nvs_handle_t h;
+    if (nvs_open("pass_net", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u8(h, "dyn", dyn ? 1 : 0);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
 
 static passport_page_t *s_page;
 static lv_obj_t *s_status;
@@ -28,11 +42,20 @@ static esp_err_t handle_ping(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* 根路径直接返回内嵌编辑页：手机/电脑连上设备热点后开 http://192.168.4.1/ 即可 */
+static esp_err_t handle_index(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_send(req, transfer_editor_html_start,
+                    transfer_editor_html_end - transfer_editor_html_start);
+    return ESP_OK;
+}
+
 /* 诊断接口：返回当前存储的字段值，用于远程核查文件内容 */
 static esp_err_t handle_get_fields(httpd_req_t *req)
 {
     static const char *const names[] = {"nickname", "college", "major", "student_id"};
-    char body[512];
+    char body[1024];
     size_t off = 0;
     off += snprintf(body + off, sizeof(body) - off, "{");
     for (size_t i = 0; i < 4; ++i) {
@@ -47,6 +70,16 @@ static esp_err_t handle_get_fields(httpd_req_t *req)
         off += snprintf(body + off, sizeof(body) - off,
                         "%s\"%s\":\"%s\"", i ? "," : "", names[i], shown);
         if (off >= sizeof(body) - 2) break;
+        /* 自定义标签（第二类行）一并回传，供编辑页回填 */
+        if (i != 0) {
+            char lb[24] = {0}; size_t ll = 0; char lpath[64];
+            snprintf(lpath, sizeof(lpath), PASSPORT_FS_ROOT "/%s_label.txt", names[i]);
+            if (passport_storage_read_text(lpath, lb, sizeof(lb), &ll) == ESP_OK && ll > 0) {
+                char lshow[30] = ""; snprintf(lshow, sizeof(lshow), "%s", lb);
+                off += snprintf(body + off, sizeof(body) - off, ",\"%s_label\":\"%s\"", names[i], lshow);
+                if (off >= sizeof(body) - 2) break;
+            }
+        }
     }
     if (off > sizeof(body) - 2) off = sizeof(body) - 2;
     snprintf(body + off, sizeof(body) - off, "}");
@@ -210,6 +243,18 @@ static esp_err_t handle_post_upload(httpd_req_t *req)
         if (need_more && remaining <= 0) break;
     }
 
+    /* 编辑页会带一个 avatar_mode 字段（photo/pet）：据此切 NVS dyn，并删除临时文件 */
+    {
+        char am[8] = {0}; size_t al = 0;
+        char amp[64]; snprintf(amp, sizeof(amp), PASSPORT_FS_ROOT "/avatar_mode.txt");
+        if (passport_storage_read_text(amp, am, sizeof(am), &al) == ESP_OK && al > 0) {
+            set_dyn_flag(strncmp(am, "pet", 3) == 0);   /* pet→动态(dyn=1)，其余含 photo→静态 */
+            nvs_handle_t h;  /* 用 storage 层删除该临时文件 */
+            (void)h;
+            remove(amp);
+        }
+    }
+
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     httpd_resp_sendstr(req, "OK");
     ESP_LOGI(TAG, "Upload complete");
@@ -238,6 +283,9 @@ static void start_http_server(void)
         return;
     }
 
+    httpd_register_uri_handler(s_server, &(httpd_uri_t){
+        .uri = "/", .method = HTTP_GET, .handler = handle_index
+    });
     httpd_register_uri_handler(s_server, &(httpd_uri_t){
         .uri = "/ping", .method = HTTP_GET, .handler = handle_ping
     });
@@ -289,7 +337,7 @@ void show_transfer_wifi(void)
     char url[128];
     snprintf(url, sizeof(url), "http://%s/", ip);
     if (s_url_label) passport_ui_label_set_text(s_url_label, url);
-    if (s_status) passport_ui_label_set_text(s_status, "请在电脑打开 tools/transfer.html，输入本机IP传输");
+    if (s_status) passport_ui_label_set_text(s_status, "同一WiFi下，手机/电脑浏览器打开上面的地址即可编辑");
 }
 
 void show_transfer(void)
