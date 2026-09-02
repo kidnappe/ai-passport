@@ -1,0 +1,11 @@
+{
+  "volcano_api_key": "PASTE_YOUR_VOLCANO_API_KEY_HERE",
+  "volcano_ws_url": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+  "volcano_resource_id": "volc.bigasr.sauc.duration",
+  "volcano_model": "bigmodel_async",
+  "volcano_enable_nonstream": true,
+  "channel": "ble",
+  "usb_port": "",
+  "inject_focus_delay": 2.0,
+  "inject_mode": "auto"
+}

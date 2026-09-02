@@ -1,0 +1,8 @@
+build/*
+!build/pack.py
+dist/
+
+config.local.json
+.venv/
+__pycache__/
+*.pyc
