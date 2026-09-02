@@ -10,6 +10,7 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/err.h"
 #include "nvs.h"
+#include "wifi_ap_prov.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,13 +59,26 @@ static esp_err_t open_softap(void)
     wc.ap.authmode = WIFI_AUTH_OPEN;   /* 免密，和配网热点一致 */
     esp_wifi_set_mode(WIFI_MODE_APSTA);
     esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &wc);
-    if (err == ESP_OK) s_ap_open = true;
-    return err;
+    if (err != ESP_OK) return err;
+    s_ap_open = true;
+    /* captive: 手机连上热点后, 任何域名解析都指向 AP 网关(默认 192.168.4.1),
+     * 配合下面 httpd 的探测 URL→302, 让手机自动弹出编辑页 */
+    esp_ip4_addr_t gwg;
+    IP4_ADDR(&gwg, 192, 168, 4, 1);
+    if (s_ap_netif) {
+        esp_netif_ip_info_t ipi;
+        if (esp_netif_get_ip_info(s_ap_netif, &ipi) == ESP_OK && ipi.gw.addr) {
+            gwg.addr = ipi.gw.addr;
+        }
+    }
+    wifi_ap_captive_dns_start(gwg.addr);
+    return ESP_OK;
 }
 
 static void close_softap(void)
 {
     if (!s_ap_open) return;
+    wifi_ap_captive_dns_stop();
     esp_wifi_set_mode(WIFI_MODE_STA);
     s_ap_open = false;
 }
@@ -73,6 +87,17 @@ static esp_err_t handle_ping(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "pong");
+    return ESP_OK;
+}
+
+/* captive portal 探测(各系统) → 302 跳到编辑页, 让手机连上热点后自动弹出 */
+static esp_err_t handle_captive(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_send(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -307,7 +332,7 @@ static void start_http_server(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 8;
+    config.max_uri_handlers = 20;
     config.stack_size = 4096;
     config.server_port = 80;
 
@@ -329,6 +354,19 @@ static void start_http_server(void)
     httpd_register_uri_handler(s_server, &(httpd_uri_t){
         .uri = "/upload", .method = HTTP_POST, .handler = handle_post_upload
     });
+
+    /* captive portal 探测端点 → 302 到编辑页, 手机连上热点即自动弹出 */
+    static const char *const captive_urls[] = {
+        "/hotspot-detect.html", "/generate_204*", "/mobile/status.php",
+        "/check_network_status.txt", "/ncsi.txt", "/fwlink/",
+        "/connectivity-check.html", "/success.txt", "/portal.html",
+        "/library/test/success.html",
+    };
+    for (size_t i = 0; i < sizeof(captive_urls) / sizeof(captive_urls[0]); ++i) {
+        httpd_register_uri_handler(s_server, &(httpd_uri_t){
+            .uri = captive_urls[i], .method = HTTP_GET, .handler = handle_captive
+        });
+    }
 
     s_server_running = true;
     ESP_LOGI(TAG, "HTTP server started on port 80");

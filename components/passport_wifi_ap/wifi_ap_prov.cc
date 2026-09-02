@@ -13,11 +13,13 @@
 #include <esp_wifi.h>
 
 #include "wifi_configuration_ap.h"
+#include "dns_server.h"
 
 #define TAG "wifi_ap_prov"
 #define PROV_SSID_PREFIX "AI Passport"
 
 static std::unique_ptr<WifiConfigurationAp> s_ap;
+static std::unique_ptr<DnsServer> s_captive_dns;   /* 通用 captive（传输页自开热点用） */
 
 static std::mutex s_creds_mutex;
 static char s_creds_ssid[33];
@@ -100,4 +102,23 @@ void wifi_ap_prov_stop(void)
     } else {
         ESP_LOGI(TAG, "热点配网已停止, 已恢复 STA 模式");
     }
+}
+
+esp_err_t wifi_ap_captive_dns_start(uint32_t gateway_ip)
+{
+    if (s_captive_dns) return ESP_OK;
+    s_captive_dns = std::make_unique<DnsServer>();
+    esp_ip4_addr_t gw;
+    gw.addr = gateway_ip;                 /* 主机序 IPv4 (如 192.168.4.1) */
+    s_captive_dns->Start(gw);
+    ESP_LOGI(TAG, "captive DNS 已启动 (→ " IPSTR ")", IP2STR(&gw));
+    return ESP_OK;
+}
+
+void wifi_ap_captive_dns_stop(void)
+{
+    if (!s_captive_dns) return;
+    s_captive_dns->Stop();
+    s_captive_dns.reset();
+    ESP_LOGI(TAG, "captive DNS 已停止");
 }
