@@ -35,6 +35,40 @@ static lv_obj_t *s_url_label;
 static httpd_handle_t s_server;
 static bool s_server_running;
 
+/* ---- B2: 传输页自开一个"免密热点"(APSTA, WIFI_AUTH_OPEN)，手机连上后开浏览器到 192.168.4.1 ---- */
+static esp_netif_t *s_ap_netif;
+static bool s_ap_open;
+
+static void build_ap_ssid(char *out, size_t n)
+{
+    snprintf(out, n, "Passport-Set-%s", passport_identity_code());
+}
+
+static esp_err_t open_softap(void)
+{
+    if (s_ap_open) return ESP_OK;
+    if (!s_ap_netif) s_ap_netif = esp_netif_create_default_wifi_ap();
+    wifi_config_t wc = {0};
+    char ssid[40];
+    build_ap_ssid(ssid, sizeof(ssid));
+    strncpy((char *)wc.ap.ssid, ssid, sizeof(wc.ap.ssid) - 1);
+    wc.ap.ssid_len = strlen(ssid);
+    wc.ap.channel = 1;
+    wc.ap.max_connection = 4;
+    wc.ap.authmode = WIFI_AUTH_OPEN;   /* 免密，和配网热点一致 */
+    esp_wifi_set_mode(WIFI_MODE_APSTA);
+    esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &wc);
+    if (err == ESP_OK) s_ap_open = true;
+    return err;
+}
+
+static void close_softap(void)
+{
+    if (!s_ap_open) return;
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    s_ap_open = false;
+}
+
 static esp_err_t handle_ping(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/plain");
@@ -309,35 +343,22 @@ static void stop_http_server(void)
     }
 }
 
-static void get_ip_str(char *ip, size_t len)
-{
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (!netif) { snprintf(ip, len, "无连接"); return; }
-    esp_netif_ip_info_t ip_info;
-    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
-        snprintf(ip, len, "无IP");
-        return;
-    }
-    snprintf(ip, len, IPSTR, IP2STR(&ip_info.ip));
-}
 
 void show_transfer_wifi(void)
 {
-    char ip[32];
-    get_ip_str(ip, sizeof(ip));
-    if (strcmp(ip, "无连接") == 0 || strcmp(ip, "无IP") == 0) {
-        if (s_status) passport_ui_label_set_text(s_status, "WiFi 未连接，请先配网");
+    /* 开免密热点 + 起 HTTP 服务(设备自己 serve 编辑页)；手机连热点后开 http://192.168.4.1/ */
+    if (open_softap() != ESP_OK) {
+        if (s_status) passport_ui_label_set_text(s_status, "热点启动失败");
         return;
     }
+    if (!s_server_running) start_http_server();
 
-    if (!s_server_running) {
-        start_http_server();
-    }
-
-    char url[128];
-    snprintf(url, sizeof(url), "http://%s/", ip);
-    if (s_url_label) passport_ui_label_set_text(s_url_label, url);
-    if (s_status) passport_ui_label_set_text(s_status, "同一WiFi下，手机/电脑浏览器打开上面的地址即可编辑");
+    char ssid[40];
+    build_ap_ssid(ssid, sizeof(ssid));
+    char line[96];
+    snprintf(line, sizeof(line), "热点: %s（无密码）", ssid);
+    if (s_status) passport_ui_label_set_text(s_status, line);
+    if (s_url_label) passport_ui_label_set_text(s_url_label, "手机连上后浏览器打开  http://192.168.4.1/");
 }
 
 void show_transfer(void)
@@ -345,28 +366,18 @@ void show_transfer(void)
     if (s_page) return;
 
     s_page = passport_ui_page_create("传输", true, true);
-    s_status = passport_ui_label_create(s_page, "");
-    s_url_label = passport_ui_label_create(s_page, "");
-
-    passport_ui_label_create(s_page, "WiFi 传输");
-    passport_ui_label_create(s_page, "按 OK 启动传输服务");
+    s_status = passport_ui_label_create(s_page, "编辑工牌字段/头像");
+    s_url_label = passport_ui_label_create(s_page, "按 OK 开启传输热点");
     passport_ui_label_create(s_page, "");
-    passport_ui_label_create(s_page, "蓝牙传输");
-    passport_ui_label_create(s_page, "设备名: Passport-");
-    lv_obj_t *dev_label = passport_ui_label_create(s_page, "");
-    if (dev_label) {
-        char dev[64];
-        snprintf(dev, sizeof(dev), "Passport-%s", passport_identity_code());
-        passport_ui_label_set_text(dev_label, dev);
-    }
-    passport_ui_label_create(s_page, "使用手机 App 通过蓝牙连接发送数据");
-
-    passport_ui_page_set_actions(s_page, "WiFi传输", "主页");
+    passport_ui_label_create(s_page, "1) 手机连热点 Passport-Set-xxxx(无密码)");
+    passport_ui_label_create(s_page, "2) 浏览器打开 http://192.168.4.1/");
+    passport_ui_page_set_actions(s_page, "开启热点", "主页");
     passport_ui_page_show(s_page);
 }
 
 void transfer_stop(void)
 {
+    close_softap();
     stop_http_server();
     /* s_page must be cleared too, otherwise show_transfer() early-returns on
      * the next visit and leaves the user on a blank screen. */

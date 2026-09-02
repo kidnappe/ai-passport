@@ -972,9 +972,10 @@ static void show_transfer_page(void)
     destroy_native_view();
     destroy_transfer_page();
     s_prev_view = s_view;
-    /* 传输走 WiFi STA(HTTP server 需 IP):按需启用,离开由 destroy_native_view 停 */
+    /* 传输改走"设备自开免密热点"：只需起 WiFi 驱动(wifi_sta_init 内含 esp_wifi_start)，
+     * 不再连家里 WiFi(避免卡在 30s 等待 IP)。手机连设备热点后开 http://192.168.4.1/。 */
     if (s_wifi_enabled) {
-        if (wifi_sta_init() == ESP_OK) wifi_sta_connect_default();
+        wifi_sta_init();
     }
     show_transfer();
     s_view = VIEW_TRANSFER;
