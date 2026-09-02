@@ -1,12 +1,16 @@
-# o-platform —— FoloToy AI Passport 语音输入 + PPT 遥控固件
+# o-platform —— FoloToy AI Passport 多合一固件
 
 <p align="right">
   <a href="README.md">English</a> · <strong>简体中文</strong>
 </p>
 
-**项目名：`o-platform`。** 面向 **FoloToy AI Passport** 工牌（ESP32-C3）的固件，在一套共享
-蓝牙栈上同时运行两个功能——**PPT 遥控**（蓝牙 HID 键盘）与**语音输入**（端侧采集 → PC 流式语音
-识别 → 把文字打回桌面），并让它们**共存互不干扰**。
+**项目名：`o-platform`。** 面向 **FoloToy AI Passport** 工牌（ESP32-C3）的多合一固件。当前已落地
+**PPT 遥控**（蓝牙 HID 键盘）与**语音输入**（端侧采集 → PC 流式语音识别 → 把文字打回桌面）两个功能，
+让它们在**一套共享蓝牙栈上共存互不干扰**。
+
+**愿景：** `o-platform` 的目标是一个**插件式平台**——让开发者能方便地把社区/他人的功能**移植**进来，
+按本项目的分层规约归位、复用同一条 BLE/Wi‑Fi/内存预算，而不是各做一个互不兼容的分支固件。本文档的
+「移植参考」与「内存/栈工程」两节，正是为降低移植门槛而写。
 
 ---
 
@@ -20,7 +24,7 @@ donor 代码**按本平台分层重组、并非整仓搬运**，且文件头保�
 |---|---|---|---|
 | **底座平台** | [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport)（插件化平台：`.pap` 包 / BLE 安装 / `passport_core`·`ui`·`runtime`） | — | `o-platform/` 基线 |
 | **UI 风格参考** | [`FoloToy/ai-passport`](https://github.com/FoloToy/ai-passport)（官方固件，像素风语言） | — | 仅视觉借鉴 |
-| **Wi‑Fi 配网** | [`killhello/ai-pass-port-wifi`](https://github.com/killhello/ai-pass-port-wifi) | — | 自研重写：`main/ble_prov.c` + `components/passport_wifi_ap/` |
+| **Wi‑Fi 配网** | 最终采用**小智的热点配网**：[`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect)（softAP + captive portal） | MIT | `components/passport_wifi_ap/`（早期 BLE 配网 `main/ble_prov.c` 已重构为热点配网） |
 | **语音输入** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | `components/passport_voice/` + PC 端 `companion/` |
 | **PPT 遥控** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | 经官方 `esp_hid` 组件，落在 `components/passport_ppt/` |
 

@@ -1,12 +1,17 @@
-# o-platform — Voice Input + PPT Remote firmware for FoloToy AI Passport
+# o-platform — all-in-one firmware for the FoloToy AI Passport
 
 <p align="right">
   <strong>English</strong> · <a href="README.zh_CN.md">简体中文</a>
 </p>
 
-**Project: `o-platform`.** Firmware for the **FoloToy AI Passport** badge (ESP32-C3) that runs two
-Bluetooth features — **PPT remote** (BLE HID keyboard) and **voice input** (on-device capture → PC
-streaming ASR → typed transcript) — **coexisting on one shared stack**.
+**Project: `o-platform`.** All-in-one firmware for the **FoloToy AI Passport** badge (ESP32-C3). It
+currently ships two Bluetooth features — **PPT remote** (BLE HID keyboard) and **voice input**
+(on-device capture → PC streaming ASR → typed transcript) — **coexisting on one shared stack**.
+
+**Vision:** `o-platform` aims to be a **plugin-style platform** — so developers can conveniently
+**port community / third-party features** in, re-tiering them into this project's layers and sharing
+the same BLE / Wi-Fi / memory budget, instead of each shipping an incompatible fork. The
+"Porting sources" and "Memory / stack engineering" sections below are written to lower that barrier.
 
 ---
 
@@ -22,7 +27,7 @@ comment in its file headers.
 |---|---|---|---|
 | **Base platform** | [`rvaim/ai-passport`](https://github.com/rvaim/ai-passport) (plugin platform: `.pap` packages, BLE install, `passport_core`/`ui`/`runtime`) | — | `o-platform/` baseline |
 | **UI style reference** | [`FoloToy/ai-passport`](https://github.com/FoloToy/ai-passport) (official firmware, pixel-art language) | — | visual style only |
-| **Wi-Fi provisioning** | [`killhello/ai-pass-port-wifi`](https://github.com/killhello/ai-pass-port-wifi) | — | rewritten in-house: `main/ble_prov.c` + `components/passport_wifi_ap/` |
+| **Wi-Fi provisioning** | **final: 小智's hotspot provisioning** — [`78/esp-wifi-connect`](https://github.com/78/esp-wifi-connect) (softAP + captive portal) | MIT | `components/passport_wifi_ap/` (the earlier BLE provisioning in `main/ble_prov.c` was reworked into hotspot) |
 | **Voice input** | [`zhaohuaxiaoy/folo-ai-passport-voice`](https://github.com/zhaohuaxiaoy/folo-ai-passport-voice) | MIT | `components/passport_voice/` + PC `companion/` |
 | **PPT remote** | [`YeatsLiao/ai-passport-ppt`](https://github.com/YeatsLiao/ai-passport-ppt) | MIT | `components/passport_ppt/` via official `esp_hid` |
 
