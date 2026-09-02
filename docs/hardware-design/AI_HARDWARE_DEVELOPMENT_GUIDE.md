@@ -6,13 +6,7 @@
 
 This is the board-level context for AI coding assistants and new developers. It records confirmed hardware facts, software architecture, invariants, extension points, and acceptance methods; it does not replace component datasheets.
 
-> For firmware behavior, use `components/bsp/include/bsp_pins.h` and the BSP implementation as the source of truth. Do not copy assumptions from a generic ESP32-C3 board.
-
-Document scope:
-
-- Applicable target: the ESP32-C3 FoloToy AI Passport mapping implemented by this repository.
-- Product specifications are in [specifications.md](specifications.md); firmware behavior follows `bsp_pins.h`, BSP implementations, `sdkconfig.defaults`, `partitions.csv`, and the demo code.
-- Code audit date: 2026-08-26.
+> Evidence priority: schematic/PCB and measurements > `components/bsp/include/bsp_pins.h` > BSP implementation and this guide > README/demo code. Report conflicts and request the board revision or measurements instead of guessing.
 
 ## 1. Before changing hardware-facing code
 
@@ -20,28 +14,28 @@ Document scope:
 2. Run `git status --short --branch` and preserve unrelated changes.
 3. Put reusable hardware behavior in `components/bsp`; keep menu, animation, product interaction, and validation pages in `main`.
 4. Keep pins, I2C addresses, and panel dimensions in `bsp_pins.h` only.
-5. Keep hardware-facing changes within the product specification and explicit BSP definitions.
+5. Mark unknown board revisions, polarity, registers, and wiring as unverified.
 
 ## 2. Board overview
 
 The target is the ESP32-C3 FoloToy AI Passport with ESP-IDF 5.5.3. It has 8 MB Flash and no PSRAM; display, audio, radio, tasks, and DMA compete for internal RAM.
 
-| Subsystem | Device or mode | Resource | Firmware support |
+| Subsystem | Device or mode | Resource | Status |
 | --- | --- | --- | --- |
-| MCU | ESP32-C3 | 8 MB Flash, no PSRAM | Configured |
-| Display | ST7789P3, 240 × 320, RGB565 | SPI2, 40 MHz, mode 0 | Driver and validation page |
-| Backlight | LCD LED | GPIO21, LEDC 5 kHz/10 bit | PWM brightness control |
-| Buttons | UP/DOWN/OK resistor ladder | GPIO0 / ADC1_CH0 | Events and live-voltage page |
-| Audio | ES8311 playback and microphone | shared I2C + I2S0 full duplex | Playback and recording page |
-| Battery | CW2017 fuel gauge | shared I2C0, address `0x63` | Optional SOC and voltage driver |
-| Wi-Fi | 2.4 GHz station | initialized by the demo | Scan page |
-| Bluetooth LE | NimBLE peripheral | initialized by the demo | Non-connectable advertising page |
-| Low power | light/deep sleep | RTC timer wake | 2 s light and 5 s deep-sleep modes |
+| MCU | ESP32-C3 | 8 MB Flash | Implemented |
+| Display | ST7789P3, 240 × 320, RGB565 | SPI2, 40 MHz, mode 0 | Implemented |
+| Backlight | LCD LED | GPIO21, LEDC 5 kHz/10 bit | Implemented |
+| Buttons | UP/DOWN/OK resistor ladder | GPIO0 / ADC1_CH0 | Implemented |
+| Audio | ES8311 playback and microphone | shared I2C + I2S0 full duplex | Implemented |
+| Battery | CW2017 fuel gauge | shared I2C0, address `0x63` | Optional |
+| Wi-Fi | 2.4 GHz station | initialized by the demo | Scan demo |
+| Bluetooth LE | NimBLE peripheral | initialized by the demo | advertising demo |
+| Low power | light/deep sleep | RTC timer wake | 2 s light and 5 s deep sleep demos |
 | Console | USB Serial/JTAG | native USB GPIO18/19 | Configured |
 
-## 3. Pin map and resource ownership
+The repository does not include schematic, PCB, BOM, battery model, charge-controller details, LCD TE connection, or board revision. Do not claim charging control, USB detection, unverified external wake, display readback, touch, or unused-GPIO availability.
 
-This table describes the signals allocated by the current BSP and build configuration.
+## 3. Pin map
 
 | GPIO | Function | Direction/peripheral | Notes |
 | ---: | --- | --- | --- |
@@ -60,46 +54,23 @@ This table describes the signals allocated by the current BSP and build configur
 | 20 | LCD DC | output | command/data select |
 | 21 | backlight PWM | LEDC output | conflicts with common UART0 default TX |
 
-LCD reset and amplifier enable are `-1`: display reset uses software reset, and the amplifier is treated as always enabled. A GPIO absent from this table is not automatically free.
-
-### 3.1 Peripheral ownership and coexistence
-
-| Resource | Owner | Sharing rule or conflict |
-| --- | --- | --- |
-| SPI2 | display BSP | Dedicated to the ST7789P3 in current firmware; no MISO is configured. |
-| LEDC low-speed timer 0/channel 0 | backlight BSP | New PWM users must select a non-conflicting timer/channel and recheck clock changes. |
-| ADC1 / channel 0 | button BSP | One oneshot unit is shared by button decoding and live-voltage reads; do not create a second ADC1 owner. |
-| I2C0 | `bsp_i2c` | ES8311 and CW2017 share the single bus handle; clients must not recreate the bus. |
-| I2S0 | audio BSP | TX and RX are full duplex and share MCLK/BCLK/WS. |
-| USB Serial/JTAG | console configuration | GPIO18/19 are part of the selected console path. |
-| Internal RAM/DMA | display, LVGL, audio, radio, tasks | No PSRAM exists; total free heap and largest contiguous block both matter. |
-| NVS/network event loop | `demo_radio.c` | Prepared once for Wi-Fi/BLE demos; do not erase unrelated NVS data on initialization errors. |
-| Wi-Fi/BLE stacks | individual demo pages | Current demos start on page entry and deinitialize on exit; the stacks do not remain active together. |
-
-GPIO0 is both the button ADC node and an ESP32-C3 boot-related pin. GPIO21 is the backlight output and conflicts with the commonly used UART0 TX mapping. Pin reassignment requires boot/programming-path review and on-device acceptance.
-
-### 3.2 Product interfaces outside the BSP
-
-- USB Type-C 2.0 accepts 5 V input; firmware flashing and logs use the ESP32-C3 USB Serial/JTAG interface.
-- The dedicated power button controls hardware power and is separate from the three ADC function buttons exposed by the BSP.
-- The NTAG213 is a passive NFC tag and has no MCU-facing BSP API.
-- LCD reset uses the controller's software-reset path, and amplifier enable is not controlled by an MCU GPIO.
+LCD reset and amplifier enable are `-1`: display reset uses software reset, and the amplifier is treated as always enabled. Confirm the real GPIO and active level before changing these values. A GPIO absent from this table is not automatically free.
 
 ## 4. Architecture and lifecycle
 
 ```text
 app_main
   ├─ shared I2C init and scan
-  ├─ display and LVGL init, then backlight
+  ├─ display and LVGL init, then persisted/default backlight
   ├─ button init
   ├─ audio init
   ├─ battery init
-  └─ LVGL menu and independent demo pages
+  └─ Passport system launcher, plug-in manager, settings, and themes
 ```
 
 Display/LVGL is a hard dependency. Buttons, audio, and battery are soft dependencies whose pages show `[FAIL]` while other pages remain available. Public BSP APIs are under `components/bsp/include/`; most initialization is idempotent, but there is no universal BSP deinitialization API.
 
-Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. `demo_radio.c` owns shared NVS, `esp_netif`, and default-event-loop setup. Wi-Fi and Bluetooth pages allocate their radio stacks on entry and stop/deinitialize them on exit. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
+NimBLE still uses ESP-IDF rather than the BSP, but `components/passport_link` now owns it as a system service. Normal plug-ins do not access GATT/NimBLE directly. V1 deliberately keeps only Peripheral/Broadcaster with one connection to limit RAM on the ESP32-C3 without PSRAM; active Central/Observer discovery is deferred. Wi-Fi and light/deep sleep are not exposed as Passport Platform v1 system APIs.
 
 ## 5. Display and LVGL
 
@@ -110,6 +81,8 @@ Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. `demo_radio.c
 - `swap_bytes=true` is required because LVGL emits little-endian RGB565 while SPI sends the high byte first.
 
 The LVGL DMA buffer is one `240 × 20` RGB565 buffer, about 9.6 KB; the LVGL internal pool is 24 KB. Do not add large/double buffers without checking internal RAM, the largest contiguous heap block, and I2S DMA.
+
+The system applies the persisted display brightness immediately after LVGL initialization. A fresh or invalid settings snapshot defaults to 50%; supported levels are 10% through 100% in 10% steps. Automatic screen-off sets the backlight to 0 without entering light/deep sleep.
 
 LVGL is not thread-safe. Timer callbacks in LVGL context may access objects directly. Button callbacks and worker tasks must use `bsp_lvgl_lock()`/`bsp_lvgl_unlock()`. Stop producers before deleting a page and clear static object pointers afterward.
 
@@ -152,6 +125,8 @@ The MCU is I2S master and the ES8311 is slave. I2S0 TX/RX shares MCLK GPIO6, BCL
 - `bsp_audio_read/write` block and must not run in button callbacks or the LVGL task.
 - I2S DMA uses six descriptors of 240 frames each.
 
+System volume is persisted separately from microphone gain and defaults to 30%. Key sound defaults off. The settings service queues volume previews and key feedback to its worker, which lazily initializes the codec; no blocking codec operation runs in a button callback or the LVGL task.
+
 The audio demo's three-second recording buffer is about 96 KB and is the largest transient heap allocation. Prefer chunked streaming for longer audio. Production task shutdown needs a cancellable loop and explicit exit handshake rather than deleting a task blocked in codec I/O.
 
 ## 9. CW2017 fuel gauge
@@ -167,46 +142,32 @@ Accurate production SOC requires the cell parameters, CW2017 datasheet/vendor pr
 
 ## 10. Flash, console, and memory
 
-The current product and firmware baseline uses 8 MB Flash. `sdkconfig.defaults` fixes the image to 8 MB and disables automatic flash-size header rewriting. `partitions.csv` defines 24 KB NVS, 4 KB PHY data, one 3 MB factory application, protected `cardid` at `0x356000`, and permanent Recovery at `0x700000`. This is not an ESP-IDF dual-slot OTA layout: the factory-installed Recovery performs BLE installation and must remain at its fixed address. The bootloader enters it when UP/GPIO0 is held for five seconds. A detected non-8-MB device does not match this baseline; identify the board and flash part before changing the project default.
-
-Do not erase a provisioned device or move/overlap the protected partitions.
-Community firmware contains neither device identity nor a replacement Recovery
-payload. See the [BLE compatibility contract](../development/engineering/ble-recovery-compatibility.md).
+All AI Passport hardware revisions use 8 MB Flash. `sdkconfig.defaults` fixes the image to 8 MB and disables automatic flash-size header rewriting. The current `partitions.csv` keeps 24 KB NVS, 4 KB PHY data, a 3 MB factory application, and uses the remaining ~4.94 MiB as a wear-levelled FAT `appfs` for plug-ins, themes, and staging. V1 has no OTA slot. A detected non-8-MB device is a hardware/material/connection anomaly to investigate, not a reason to lower the project default.
 
 The console is USB Serial/JTAG. Do not switch to the UART0 default output without resolving its GPIO21 conflict with the backlight.
 
-Review at least the 24 KB LVGL pool, 9.6 KB LCD DMA buffer, I2S DMA, 96 KB demo recording, radio stacks, task stacks, total free heap, and largest contiguous block when adding assets, TLS/networking, audio buffers, or double buffering.
+Review at least the 24 KB LVGL pool, 9.6 KB LCD DMA buffer, the settings worker's 3 KiB stack, lazy I2S DMA, 96 KB demo recording, radio stacks, task stacks, total free heap, and largest contiguous block when adding assets, TLS/networking, audio buffers, or double buffering.
 
 ## 11. Adding features
 
 For reusable hardware capability, add `bsp_<feature>.h` and its implementation, keep constants in `bsp_pins.h`, update component CMake/dependencies, return `esp_err_t`, log actionable pin/address context, and document threading, blocking, ownership, initialization, and failure behavior.
 
-For a validation page, implement `enter`, `exit`, and `key` in `main/demo_<feature>.c`; declare it in `demo.h`, list it in CMake, and register it in `DEMOS[]`. Create/load a page-owned screen on entry. Stop workers/timers before deleting it on exit. Keep UI text in English, put slow work in worker tasks, lock LVGL updates, and preserve global OK-long-press return behavior.
-
-Menu initialization status arrays implicitly follow `DEMOS[]` order; update and review them together.
+Only system apps should modify `main`; normal user plug-ins use Passport UI and are installed as `.pap`. Reusable platform behavior belongs in `passport_core`, `passport_ui`, `passport_link`, or `passport_runtime`, while board-level hardware remains in the BSP. Stop every UI producer before destroying a page, keep device-visible copy in Simplified Chinese with the shared 14 px / 4 bpp system font, move slow work to workers, lock LVGL outside its task, and preserve the system-level OK-long-press return behavior.
 
 ## 12. Development environment
 
-Follow the canonical [environment bootstrap](../development/engineering/environment-setup.md)
-for clean-machine installation, OS-specific prerequisites, and international or
-mainland China download routes. Use ESP-IDF 5.5.3 outside the repository,
-activate its `export.sh` in every terminal, and confirm the exact version.
-Prefer `./tools/validate.sh --firmware` to build the verified merged image and
-flash that image at `0x0`; use direct `idf.py build/flash` only for incremental
-development.
+Use ESP-IDF 5.5.3 outside the repository. On Ubuntu/Debian, install the standard ESP-IDF prerequisites, clone Espressif's `v5.5.3` tag recursively, and run `./install.sh esp32c3`. Activate its `export.sh` in every terminal and confirm `idf.py --version`.
 
 ```bash
-source <path-to-esp-idf-v5.5.3>/export.sh
-idf.py --version
+get_idf553
 idf.py set-target esp32c3
 idf.py reconfigure
 idf.py build
 ```
 
-The Component Manager resolves dependencies from `components/bsp/idf_component.yml`. Do not edit `managed_components/`. `dependencies.lock` is tracked and must remain reproducible under ESP-IDF 5.5.3. Generated `sdkconfig` does not automatically absorb every changed default; preserve intentional settings and use `idf.py set-target esp32c3` when configuration must be regenerated. Use `idf.py fullclean` only to remove stale build output.
+The Component Manager resolves dependencies from `components/bsp/idf_component.yml`. Do not edit `managed_components/`. `dependencies.lock` is tracked and must remain reproducible under ESP-IDF 5.5.3. Generated `sdkconfig` does not automatically absorb every changed default; inspect it and use `idf.py fullclean` only for stale generated state.
 
-For an intentional incremental flash, use the native USB Serial/JTAG port,
-commonly `/dev/ttyACM0` on Linux:
+Flash through the native USB Serial/JTAG port, commonly `/dev/ttyACM0` on Linux:
 
 ```bash
 idf.py -p /dev/ttyACM0 flash monitor
@@ -231,6 +192,7 @@ General board acceptance:
 | Pin/I2C | scan, all shared devices, boot straps, USB logs |
 | LCD | color blocks, orientation, clipping, inversion, byte order, backlight levels |
 | ADC/buttons | released and pressed mV, click/double/long events, margin across battery levels |
+| Settings | 50% first boot, 10% brightness steps, 30% volume preview, 30 s screen-off, consumed wake press, key-sound toggle, and reboot persistence |
 | Codec/I2S | 1 kHz tone, non-zero recording, correct playback speed, format changes, page exit |
 | Battery | plausible SOC/mV, graceful missing-device behavior, intermittent-I2C recovery |
 | Wi-Fi | visible scan count/SSID/RSSI, rescan, repeated entry/exit |
@@ -246,11 +208,13 @@ General board acceptance:
 | Wrong colors | byte swap, RGB/BGR, inversion; change one variable at a time |
 | Rotation change has no effect | LVGL rotation overriding lower-level mirror |
 | Backlight or console failure | GPIO21 conflict with UART0 default TX |
+| Screen never turns off or a wake key activates UI | persisted timeout value, activity timestamp, 250 ms worker check, and wake-sequence suppression |
 | Button confusion | external 10 kΩ pull-up, measured voltage, thresholds, attenuation |
 | `adc1 is already in use` | accidental second ADC1 oneshot unit |
 | Both I2C devices disappear | accidental second I2C0 bus |
 | Only ES8311 missing | address API shift and codec power |
 | Audio speed/pitch wrong | close/open on format change, sample rate/MCLK, no manual clock writes |
+| Key sound or volume preview is silent | key-sound setting, persisted volume, ES8311/I2S lazy-init log, and worker availability |
 | Recording is zero | `no_dac_ref`, DIN GPIO4, microphone path, gain |
 | Recording allocation fails | no PSRAM; shorten/stream and inspect largest block |
 | Battery shows `--` | `0x63` response, invalid SOC, profile/startup delay |
@@ -258,7 +222,6 @@ General board acceptance:
 | Black after light sleep | timer wake source, sleep error, backlight restore |
 | Deep sleep does not restart | timer source, boot wake cause, RTC counter |
 | I2S allocation fails after UI growth | competition among LCD/LVGL buffers and I2S DMA |
-| Chinese text appears as boxes | Montserrat 14/20 has no CJK glyphs; compile and select a CJK subset, configure fallback for mixed text, and verify glyph coverage on the device |
 
 ## 15. Pre-delivery checklist
 
@@ -271,5 +234,11 @@ General board acceptance:
 - [ ] Audio format changes retain close/open and required codec settings.
 - [ ] Memory review includes LVGL, LCD DMA, I2S DMA, task stacks, and largest block.
 - [ ] Automated validation passed or the actual failure is reported.
-- [ ] Build results and observed device results are reported separately.
+- [ ] Hardware checks remain listed as unverified until observed.
 - [ ] The diff contains only task-scoped changes and preserves user work.
+
+## 16. Missing production evidence
+
+A production hardware specification still requires board revision and schematic, PCB/BOM, complete LCD module identification and sequence source, battery model/capacity, CW2017 profile, charge and power path, speaker/microphone and amplifier details, external I2C pull-up values, power-domain/current limits, unused-GPIO connectivity, and temperature/voltage/EMC results.
+
+Until those are available, development is limited to capabilities covered by the existing BSP and timer-based light/deep sleep. External wake, board power figures, charging, unused-pin reuse, audio power, and battery accuracy require hardware evidence first.

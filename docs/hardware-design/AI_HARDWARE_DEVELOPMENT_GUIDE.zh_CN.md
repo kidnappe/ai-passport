@@ -6,13 +6,7 @@
 
 本文是面向 AI 编程助手和新开发者的板级上下文入口。目标不是替代数据手册，而是准确说明**当前仓库已经确认的硬件事实、软件架构、不可随意改变的约束、扩展方式和验收方法**。
 
-> 固件行为以 `components/bsp/include/bsp_pins.h` 和 BSP 实现为准，不得套用通用 ESP32-C3 开发板参数。
-
-文档适用范围：
-
-- 适用对象：本仓库实现的 ESP32-C3 FoloToy AI Passport 板级映射。
-- 产品规格见 [specifications.zh_CN.md](specifications.zh_CN.md)；固件行为以 `bsp_pins.h`、BSP 实现、`sdkconfig.defaults`、`partitions.csv` 与 demo 代码为准。
-- 代码复核日期：2026-08-26。
+> 信息优先级：实际原理图/PCB 与实机结果 > `components/bsp/include/bsp_pins.h` > BSP 实现与本文件 > README。若几处信息冲突，不要凭经验猜测；应先指出冲突并请求原理图、板卡版本或实测结果。
 
 ## 1. 开始任何任务前
 
@@ -22,28 +16,30 @@ AI 应先完成以下检查：
 2. 执行 `git status --short`，保留用户已有改动，不覆盖、不清理无关文件。
 3. 判断修改属于哪一层：可复用硬件能力放入 `components/bsp`；菜单、动画、业务交互和验证页面放入 `main`。
 4. 以 `bsp_pins.h` 为当前板卡引脚和面板参数的单一事实来源，不在 `.c` 文件重复写 GPIO、I2C 地址或屏幕尺寸。
-5. 硬件相关修改必须位于产品规格和 BSP 明确定义的范围内。
+5. 不确定板卡版本、极性、芯片寄存器或接线时，明确标注“未知/待实测”，不要把常见开发板参数当成本板事实。
 
 ## 2. 硬件总览
 
-当前代码针对 ESP32-C3 FoloToy AI Passport，使用 ESP-IDF 5.5.3。MCU **没有 PSRAM**，外设 DMA 和 UI 都使用内部 RAM。
+当前代码针对 ESP32-C3 FoloToy AI Passport，使用 ESP-IDF 5.5.x（已知开发环境为 5.5.3）。MCU **没有 PSRAM**，外设 DMA 和 UI 都使用内部 RAM。
 
-| 子系统 | 器件/方式 | 总线或资源 | 固件支持 |
+| 子系统 | 器件/方式 | 总线或资源 | 当前状态 |
 | --- | --- | --- | --- |
-| MCU | ESP32-C3 | 8 MB Flash、无 PSRAM | 已配置 |
-| 显示 | ST7789P3，240 × 320，RGB565 | SPI2，40 MHz，mode 0 | 驱动与验证页 |
-| 背光 | LCD LED 背光 | GPIO21，LEDC 5 kHz/10 bit | PWM 亮度控制 |
-| 按键 | UP/DOWN/OK 三键电阻分压 | GPIO0 / ADC1_CH0 | 事件与实时电压页 |
-| 音频 | ES8311，播放 + 麦克风录音 | I2C 控制 + I2S0 全双工 | 播放与录音页 |
-| 电池 | CW2017 电量计 | 共享 I2C0，地址 0x63 | 可缺省 SOC/电压驱动 |
-| Wi-Fi | ESP32-C3 2.4 GHz STA | 应用页按需初始化 | 扫描页 |
-| Bluetooth LE | ESP32-C3 NimBLE peripheral | 应用页按需初始化 | 不可连接广播页 |
-| 低功耗 | ESP32-C3 light/deep sleep | RTC timer 唤醒 | 2 秒 light sleep 和 5 秒 deep sleep 模式 |
+| MCU | ESP32-C3 | 8 MB Flash | 已实现 |
+| 显示 | ST7789P3，240 × 320，RGB565 | SPI2，40 MHz，mode 0 | 已实现 |
+| 背光 | LCD LED 背光 | GPIO21，LEDC 5 kHz/10 bit | 已实现 |
+| 按键 | UP/DOWN/OK 三键电阻分压 | GPIO0 / ADC1_CH0 | 已实现 |
+| 音频 | ES8311，播放 + 麦克风录音 | I2C 控制 + I2S0 全双工 | 已实现 |
+| 电池 | CW2017 电量计 | 共享 I2C0，地址 0x63 | 已实现，可缺省 |
+| Wi-Fi | ESP32-C3 2.4 GHz STA | 应用页按需初始化 | 扫描示例已实现 |
+| Bluetooth LE | ESP32-C3 NimBLE peripheral | 应用页按需初始化 | 不可连接广播示例已实现 |
+| 低功耗 | ESP32-C3 light/deep sleep | RTC timer 唤醒 | 两秒 light sleep 和五秒 deep sleep 示例已实现 |
 | 日志 | USB Serial/JTAG | 原生 USB GPIO18/19 | 已配置 |
 
-## 3. 引脚表与资源所有权
+仓库没有提供原理图、PCB、BOM、电池型号、充电芯片信息、LCD TE 引脚或板卡修订号。因此不能据此声称支持充电控制、USB 检测、休眠唤醒、屏幕读回、触摸或其他未在代码中出现的能力。
 
-以下是当前 BSP 和构建配置使用的**固件分配表**。数值来自 `bsp_pins.h`；变更硬件映射时只修改该文件，并同步更新本文和实机结果。
+## 3. 完整引脚表
+
+以下值来自 `bsp_pins.h`。变更硬件映射时只修改该文件，并同步更新本文和实机结果。
 
 | GPIO | 功能 | 方向/外设 | 重要说明 |
 | ---: | --- | --- | --- |
@@ -62,39 +58,16 @@ AI 应先完成以下检查：
 | 20 | LCD DC | 输出 | 命令/数据选择 |
 | 21 | LCD 背光 PWM | LEDC 输出 | 与常见 UART0 默认 TX 冲突，所以控制台不可切回该默认 TX |
 
-LCD RST 和功放 PA 使能均定义为 `-1`：LCD 复位使用软件路径，功放被视为常通。
+LCD RST 和功放 PA 使能均定义为 `-1`：LCD 复位脚未接 MCU，驱动使用软件复位；功放被视为常通。若硬件版本不同，应填入真实 GPIO，并核对有效电平。
 
-当前所有已用 GPIO 为 0–10、18–21。未列出的 GPIO 不属于公开应用接口。
-
-### 3.1 外设所有权与共存关系
-
-| 资源 | 所有者 | 共享规则或冲突 |
-| --- | --- | --- |
-| SPI2 | 显示 BSP | 当前固件专用于 ST7789P3，未配置 MISO。 |
-| LEDC low-speed timer 0/channel 0 | 背光 BSP | 新 PWM 功能必须选择不冲突的 timer/channel，并复核时钟变化。 |
-| ADC1 / channel 0 | 按键 BSP | 按键识别与实时电压共用一个 oneshot unit，不可再创建第二个 ADC1 所有者。 |
-| I2C0 | `bsp_i2c` | ES8311 与 CW2017 共用唯一 bus handle，客户端不得重建总线。 |
-| I2S0 | 音频 BSP | TX/RX 全双工，共用 MCLK/BCLK/WS。 |
-| USB Serial/JTAG | 控制台配置 | GPIO18/19 属于当前控制台路径。 |
-| 内部 RAM/DMA | 显示、LVGL、音频、无线、任务 | 无 PSRAM；总空闲堆和最大连续块都必须检查。 |
-| NVS/网络 event loop | `demo_radio.c` | 为 Wi-Fi/BLE demo 一次性准备；初始化失败时不得擦除无关 NVS 数据。 |
-| Wi-Fi/BLE 协议栈 | 各自 demo 页面 | 当前页面进入时启动、退出时释放，不同时常驻。 |
-
-GPIO0 同时是按键 ADC 节点和 ESP32-C3 启动相关管脚；GPIO21 是背光输出，并与常见 UART0 TX 映射冲突。重分配引脚必须复核启动/烧录路径并完成实机验收。
-
-### 3.2 BSP 之外的产品接口
-
-- USB Type-C 2.0 接受 5 V 输入；固件烧录和日志使用 ESP32-C3 USB Serial/JTAG 接口。
-- 独立电源键控制硬件电源，与 BSP 暴露的三枚 ADC 功能键相互独立。
-- NTAG213 是被动 NFC 标签，不提供 MCU 侧 BSP API。
-- LCD 复位使用控制器软件复位路径，功放使能不由 MCU GPIO 控制。
+当前所有已用 GPIO 为 0–10、18–21。不要仅因某个号码未出现在表中就认定它可用；必须先结合板卡原理图和 ESP32-C3 封装/Flash 连接确认。
 
 ## 4. 软件架构与启动流程
 
 ```text
 app_main
   ├─ bsp_i2c_init → bsp_i2c_scan
-  ├─ bsp_display_init → bsp_lvgl_init → backlight 100%
+  ├─ bsp_display_init → bsp_lvgl_init → 持久化亮度（首次默认 50%）
   ├─ bsp_button_init(on_key)
   ├─ bsp_audio_init
   ├─ bsp_battery_init
@@ -105,7 +78,7 @@ app_main
        ├─ Battery demo
        ├─ Wi-Fi scan demo
        ├─ Bluetooth LE advertising demo
-       └─ Low Power sleep-mode demo
+       └─ Light-sleep demo
 ```
 
 显示是 UI 的硬依赖，显示或 LVGL 初始化失败时 `app_main` 直接返回。按键、音频、电池是软依赖：初始化失败的菜单项显示 `[FAIL]`，其他页面仍可用。
@@ -121,7 +94,7 @@ app_main
 
 驱动初始化大多设计为幂等，但当前没有统一 deinit API。不要假设可以在运行时反复销毁和重建总线/驱动。
 
-Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。`demo_radio.c` 只管理 NVS、`esp_netif` 和默认 event loop 这些应用级共享前置。Wi-Fi 和 BLE 页在进入时初始化高内存占用的无线栈，退出时停止并释放；不自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
+NimBLE 仍直接使用 ESP-IDF，不属于板级 BSP，但已经由 `components/passport_link` 封装为系统能力。普通插件不得直接访问 GATT/NimBLE。V1 只保持 Peripheral/Broadcaster 和单连接，以控制无 PSRAM ESP32-C3 的 RAM；主动 Central/Observer 扫描暂缓。Wi-Fi 与 light/deep sleep 当前未作为 Passport Platform v1 的系统 API 暴露。
 
 ## 5. 显示与 LVGL
 
@@ -138,6 +111,8 @@ Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 B
 ### 5.2 LVGL 内存和线程规则
 
 ESP32-C3 无 PSRAM。当前 LVGL 显示缓冲为 `240 × 20` 像素的单 DMA 缓冲，RGB565 约 9.6 KB；`sdkconfig.defaults` 的 LVGL 内部池为 24 KB。不要直接改为大行数双缓冲，也不要扩大 UI 内存池而不检查内部 RAM、最大连续堆和 I2S DMA 初始化。
+
+系统在 LVGL 初始化后立即应用持久化屏幕亮度。首次启动或设置快照无效时默认 50%，可在 10%～100% 间按 10% 调整。自动息屏只把背光设为 0，不进入 light/deep sleep。
 
 LVGL 非线程安全：
 
@@ -209,6 +184,8 @@ MCU 是 I2S master，ES8311 是 slave；I2S0 的 TX/RX 全双工通道共享 MCL
 - `bsp_audio_read/write` 是阻塞调用，不能放在按键回调或 LVGL 任务中。
 - I2S DMA 当前为 6 个 descriptor、每个 240 frame。更改 DMA 或 LVGL buffer 前必须联合评估内部 RAM。
 
+系统音量与麦克风增益分开持久化，首次默认 30%；按键音默认关闭。设置服务把音量试听和按键反馈投递给工作任务，并且仅在实际播放时按需初始化 codec；按键回调和 LVGL 任务不会执行阻塞式 codec 操作。
+
 Audio demo 使用独立 4 KB 栈任务：OK 播放 1 秒 1 kHz 方波，UP 录 3 秒再回放。录音缓冲约 96 KB，是当前最显著的瞬时堆分配，可能因碎片或其他功能增大而失败。新增长录音应优先采用分块流式处理或外部存储，不可假设存在 PSRAM。
 
 当前 demo 的退出会直接删除音频任务。如果任务正阻塞于 codec 读写，实际硬件上需特别验证退出行为；若扩展为生产逻辑，应设计可取消的分块循环与明确的任务退出握手。
@@ -226,10 +203,7 @@ SOC 准确度取决于电芯与 profile 的匹配程度。本驱动给出的是�
 
 ## 10. Flash、控制台和资源预算
 
-当前产品与固件基线使用 8 MB Flash。`sdkconfig.defaults` 固定使用 8 MB Flash 镜像配置，并关闭 `CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE`（不按探测容量回写镜像头，便于 `idf.py merge-bin`）；`partitions.csv` 提供 24 KB NVS、4 KB PHY data、3 MB factory app、位于 `0x356000` 的保护 `cardid`，以及位于 `0x700000` 的永久 Recovery。这不是 ESP-IDF 双槽 OTA 布局；工厂预装 Recovery 负责 BLE 安装，且必须保持固定地址。开机持续按住上键/GPIO0 5 秒时，bootloader 会进入 Recovery。若实机探测结果不是 8 MB，则该设备不符合当前基线；修改项目默认值前应先确认板卡和 Flash 料号。
-
-不得擦除已写身份的设备，也不得移动或覆盖保护分区。社区固件既不包含单机身份，
-也不携带替换 Recovery 的数据。详见 [BLE 兼容契约](../development/engineering/ble-recovery-compatibility.zh_CN.md)。
+FoloToy AI Passport 的所有硬件批次均使用 8 MB Flash，`sdkconfig.defaults` 因此固定使用 8 MB Flash 镜像配置，并关闭 `CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE`。当前 `partitions.csv` 保留 24 KB NVS、4 KB PHY data、3 MB factory app，并把剩余约 4.94 MiB 作为 wear-levelled FAT `appfs`，用于插件、主题和 staging 安装；V1 不设置 OTA 槽。若实机探测结果不是 8 MB，应先确认硬件/料号/连接异常，不能为了未知板卡降低默认容量。
 
 控制台固定为 USB Serial/JTAG，不使用 UART0 默认输出，因为其 TX GPIO21 与背光冲突。任何日志接口修改都必须同时检查引脚占用。
 
@@ -237,7 +211,8 @@ SOC 准确度取决于电芯与 profile 的匹配程度。本驱动给出的是�
 
 - LVGL 静态内存池 24 KB；
 - LCD DMA buffer 约 9.6 KB；
-- I2S DMA descriptor/frame buffer；
+- 设置工作任务栈 3 KiB；
+- 按需初始化的 I2S DMA descriptor/frame buffer；
 - Audio demo 96 KB 录音堆；
 - Wi-Fi 驱动或 NimBLE host/controller（两个示例不同时常驻）；
 - 各 FreeRTOS 任务栈和最大连续空闲块。
@@ -254,25 +229,18 @@ SOC 准确度取决于电芯与 profile 的匹配程度。本驱动给出的是�
 4. 初始化应尽量幂等，错误应返回 `esp_err_t` 并输出包含引脚/地址的诊断日志。
 5. 明确 API 的线程、阻塞、内存所有权、任务上下文和失败返回值。
 
-新增硬件验证页：
+新增系统页面或硬件验证入口：
 
-1. 创建 `main/demo_<feature>.c`，实现 `enter`、`exit`、`key`。
-2. 在 `main/demo.h` 声明，在 `main/CMakeLists.txt` 加源文件，在 `main.c` 的 `DEMOS[]` 注册。
-3. `enter` 创建并加载自己的 screen；`exit` 先停任务/定时器，再删 screen 和清空指针。
-4. 页面文字保持英文；说明性注释可用中文。
-5. 慢操作放工作任务，结果通过 LVGL 锁更新界面。
-6. 保留 OK 长按返回这一全局交互，不在页面重复实现。
-
-如果菜单项依赖新外设，还需扩展 `s_ok[]` 初始化与失败禁用逻辑。注意当前数组索引与 `DEMOS[]` 顺序隐式对应，修改顺序时必须同步核对。
+1. 系统 App 才修改 `main`；普通用户插件优先使用 `Passport UI` + `.pap`，不复制 LVGL 页面框架。
+2. 可复用平台能力分别进入 `passport_core`、`passport_ui`、`passport_link` 或 `passport_runtime`；只有板级硬件行为进入 BSP。
+3. 页面退出时先停所有可能访问 UI 的 worker/timer，再删除页面和清空对象指针。
+4. 设备可见文案使用简体中文，统一 14 px / 4 bpp 系统字体；普通插件不携带普通 UI 字体。
+5. 慢操作放工作任务，非 LVGL 上下文更新界面必须持有 LVGL 锁。
+6. 保留 OK 长按返回这一系统级交互，不在每个页面重复实现。
 
 ## 12. 开发环境搭建
 
-全新机器安装、各操作系统依赖以及国际/中国大陆下载线路统一以
-[环境引导](../development/engineering/environment-setup.zh_CN.md)为准。项目严格使用
-**ESP-IDF 5.5.3**。不要直接使用系统中的任意 `idf.py`，也不要将 Arduino、
-PlatformIO 或其他 ESP-IDF 版本生成的配置混入当前工程。
-编译优先使用 `./tools/validate.sh --firmware` 生成并验证合并固件，烧录优先把该
-镜像写入 `0x0`；直接 `idf.py build/flash` 只用于增量开发。
+项目要求 ESP-IDF 5.5.x，推荐与已知开发环境一致使用 **ESP-IDF 5.5.3**。不要直接使用系统中的任意 `idf.py`，也不要将 Arduino、PlatformIO 或其他 ESP-IDF 版本生成的配置混入当前工程。
 
 ### 12.1 Linux / WSL 准备
 
@@ -313,16 +281,24 @@ source "$HOME/esp/esp-idf-v5.5.3/export.sh"
 idf.py --version
 ```
 
-版本输出必须为 ESP-IDF v5.5.3。文档和自动化不得依赖机器专用 alias，AI
-也不得擅自修改 shell 启动文件。
+版本输出应为 ESP-IDF v5.5.3。仓库维护者若已提供 `get_idf553` shell 快捷命令，也可以用它代替 `source .../export.sh`，但该命令不是仓库文件的一部分，不能假设所有机器都存在。
+
+可选地在自己的 shell 配置中定义快捷函数：
+
+```bash
+get_idf553() {
+    source "$HOME/esp/esp-idf-v5.5.3/export.sh"
+}
+```
+
+修改 `~/.bashrc` 或 `~/.zshrc` 属于用户级环境变更，AI 执行前应获得用户授权；仅在文档中给出示例不代表可以自动修改。
 
 ### 12.3 获取工程依赖并首次构建
 
 进入项目根目录后执行：
 
 ```bash
-source <ESP-IDF-v5.5.3-路径>/export.sh
-idf.py --version
+get_idf553                    # 或 source 对应 export.sh
 idf.py set-target esp32c3
 idf.py reconfigure
 idf.py build
@@ -338,7 +314,7 @@ idf.py build
 grep -E 'IDF_TARGET|ESP_CONSOLE_USB_SERIAL_JTAG|SPIRAM|FLASHSIZE' sdkconfig
 ```
 
-预期目标为 ESP32-C3、控制台为 USB Serial/JTAG、Flash 为 8 MB，并且不启用 PSRAM。`sdkconfig.defaults` 只影响新生成配置；已有 `sdkconfig` 不会自动完全跟随 defaults。defaults 变化后应检查配置差异，保留有意设置后运行 `idf.py set-target esp32c3` 重新生成配置。`idf.py fullclean` 只用于清理构建输出。
+预期目标为 ESP32-C3、控制台为 USB Serial/JTAG、Flash 为 8 MB，并且不启用 PSRAM。`sdkconfig.defaults` 只影响新生成配置；已有 `sdkconfig` 不会自动完全跟随 defaults。defaults 变化后应检查配置差异，必要时备份有用选项后执行 `idf.py fullclean` 并重新配置。
 
 ### 12.4 连接、烧录与监视
 
@@ -393,11 +369,10 @@ idf.py build
 
 ## 13. 构建与验证
 
-默认优先运行 `./tools/validate.sh --firmware`。以下命令仅用于增量开发：
+推荐环境：
 
 ```bash
-source <ESP-IDF-v5.5.3-路径>/export.sh
-idf.py --version
+get_idf553
 idf.py set-target esp32c3   # 新 checkout 或目标变化时
 idf.py build
 idf.py flash monitor
@@ -405,7 +380,7 @@ idf.py flash monitor
 
 配置陈旧时可执行 `idf.py fullclean`，但这会删除生成的 build 状态；不要用它处理源码工作区问题。
 
-仓库有 `tests/test_ui_pixel_math.c` 轻量逻辑测试源，但当前根 CMake 是 ESP-IDF 工程，未提供统一的 host test 命令。因此 `idf.py build` 是最低自动检查，硬件变更必须上板。
+仓库提供 Passport Link 帧协议、设置状态机、`.pap` 打包和字库的主机测试，并由 `tools/validate.sh --static` 统一调用。`idf.py build` 仍是固件级最低自动检查；涉及屏幕、ADC 按键、BLE 射频、音频、电池和实际内存水位的变更必须上板。
 
 ### 通用上板验收
 
@@ -422,6 +397,7 @@ idf.py flash monitor
 | 引脚/I2C | 扫描、所有共享设备、启动冲突、USB 日志 |
 | LCD 序列/旋转/颜色 | 红绿蓝白黑色块、方向、边缘裁切、负片、字节序、背光 100/50/10% |
 | ADC/按键 | 松开和三键实测 mV、单击/双击/长按、不同电量下的裕量 |
+| 系统设置 | 首次 50% 亮度、10% 步进、30% 音量试听、30 秒息屏、唤醒按键不透传、按键音切换及重启持久化 |
 | codec/I2S | 1 kHz 音调频率/速度、录音非零且回放速度正确、格式切换、退出页面 |
 | 电池 | 合理 SOC 和 mV、无电量计时正确降级、断续 I2C 的错误恢复表现 |
 | Wi-Fi | 扫描总数和 SSID/RSSI 可见、OK 重扫描、反复进出后仍可扫描 |
@@ -437,24 +413,25 @@ idf.py flash monitor
 | 颜色颠倒或怪色 | `swap_bytes`、RGB/BGR、反色配置；一次只改一个变量 |
 | 画面旋转修改无效 | `bsp_display_lvgl.c` rotation 覆盖底层 mirror |
 | 背光或串口异常 | GPIO21 与 UART0 默认 TX 冲突 |
+| 屏幕不息屏或唤醒键误触界面 | 持久化息屏值、活动时间戳、250 ms 工作任务检查和唤醒序列抑制 |
 | 三键混淆/误触 | 外部 10 kΩ 上拉、实测电压、阈值、ADC attenuation 一致性 |
 | `adc1 is already in use` | 是否又创建了 ADC1 oneshot unit |
 | 两个 I2C 芯片同时失联 | 是否在 I2C0 上创建了第二条临时总线 |
 | 只找不到 ES8311 | 地址 API 是否要求 `0x18 << 1`、codec 供电 |
 | 音频快/慢或变调 | 格式变化是否执行 close/open、采样率/MCLK，勿手改时钟寄存器 |
+| 按键音或音量试听无声 | 按键音开关、持久化音量、ES8311/I2S 按需初始化日志和工作任务状态 |
 | 录音全零 | `no_dac_ref` 是否为 true、DIN GPIO4、麦克风通路和输入增益 |
 | 录音缓冲分配失败 | C3 无 PSRAM；缩短录音或改流式，检查 largest free block |
 | 电量显示 `--` | 0x63 是否应答、SOC 是否读到 >100/0xFF、profile/启动等待 |
 | Wi-Fi/BLE 第二次进入失败 | 退出页时是否已停止并 deinit radio stack，NVS/event loop 是否只初始化一次 |
 | light sleep 后黑屏 | timer wake source、`esp_light_sleep_start()` 错误日志、唤醒后是否恢复背光 |
-| deep sleep 后未重启 | timer wake source、启动日志的 wake cause、页面 RTC 计数；当前 demo 使用 RTC timer 唤醒 |
+| deep sleep 后未重启 | timer wake source、启动日志的 wake cause、页面 RTC 计数；不用未验证按键作唤醒源 |
 | 加大 UI 后 I2S NO_MEM | LCD 双缓冲/LVGL pool 与 I2S DMA 争夺内部 RAM |
-| 中文显示为方框 | Montserrat 14/20 不含 CJK glyph；编译并选用中文字体子集，为混排配置 fallback，并在真机核对全部字符 |
 
 ## 15. AI 提交前自检
 
 - [ ] 变更没有硬编码重复的引脚、地址、尺寸或板级参数。
-- [ ] 没有把产品规格或 BSP 未定义的能力写成事实。
+- [ ] 没有把未经源码、原理图或实测证实的能力写成事实。
 - [ ] 没有创建第二个 I2C0 bus 或第二个 ADC1 unit。
 - [ ] 非 LVGL 上下文访问 `lv_*` 时持有锁。
 - [ ] 阻塞式硬件操作不在按键回调/LVGL 任务中。
@@ -464,3 +441,9 @@ idf.py flash monitor
 - [ ] `idf.py build` 通过并检查了 warnings；不能构建时说明真实原因。
 - [ ] 需要实机验证的项目明确列出，未把“编译通过”写成“硬件验证通过”。
 - [ ] `git diff` 只包含任务范围内的改动，用户原有修改保持不动。
+
+## 16. 仍需硬件资料确认的事项
+
+要把本指南提升为可用于量产的完整硬件规范，还需补充：板卡修订号和原理图、PCB/BOM、LCD 模组完整料号及初始化来源、电池型号与容量、CW2017 profile、充电/电源路径、扬声器和麦克风参数、功放型号及使能极性、I2C 外部上拉值、各电源域与最大电流、未用 GPIO 的实际连接，以及温度/电压/EMC 验证结果。
+
+在这些资料缺失时，AI 可以安全开发现有 BSP 覆盖的功能，以及当前已限定的 RTC timer light/deep-sleep 验证；但对外部唤醒、板级功耗数据、电源控制、充电、未用引脚复用、音频功率或电池精度需求，必须先请求硬件证据。

@@ -6,13 +6,14 @@
 
 ## Unreleased
 
-- 按功能域整理文档并采用双入口：根目录 `AGENTS.md` 变为薄路由（只保留硬约束与任务路由），详细的 AI 开发工作流下沉到 `docs/development/ai-guide.md`，`agent-guide.md` 并入其中。为 `docs/development/` 增加二级分区（`engineering/`、`ci/`、`release/`），把 `plays/` 应用档案与 `experiences/` 移入带专属 README 的 `docs/reference/` 参考区；删除 `docs/software-design/`（空脚手架）；把 `assets/{fonts,images,music}/README` 三个叶子 README 并入 `assets/` README；把 `project-completion` 的六个子文档压平为单文件；并把每个目录统一为单一 README，消除所有 `INDEX` 文件与一处重复经验索引。所有交叉引用与文献链接已更新；未丢弃任何内容。
-
-- 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
-  保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、
-  分区表 MD5/范围、3 MB 应用上限和保护分区数据不入包。
-- 规定多应用发布的 Release 标题约定：tag 按 `v<版本>-<应用名>`（如 `v0.1.0-voice-keychain`）命名，让 Release 标题同时带版本与应用名；发布成功后核对标题，保证一眼扫 Release 列表就能区分是哪个应用。
-- 新增发布后收尾流程：`issue-suggestions` skill 用于把用户反馈作为 issue 提交到上游项目；`experience-pr` skill 用于把可复用的开发经验作为文档 PR 提交；新增 `docs/experiences/` 目录保存单条经验文件；并配套 `project-completion`、`file-issues` 与经验索引文档。
+- 修复语音输入服务在键盘(HID)使用一段时间后连不上的问题（桌面端报 `Characteristic 0xA2B2 not found`）：`voice_ble_register()` 之前用一次性守卫，而离开/进入语音或 PPT 页会反初始化并重建 NimBLE、连同整张 GATT 表，导致语音服务不再注册进新表；现改为按每个 NimBLE 实例重新注册 GATT 服务与 GAP 监听。同时语音页改用独立随机蓝牙地址广播，避免 Windows 把语音连接按已配对键盘抢连接管；并修正广播重启与连接计数两处缺陷。
+- 修复 PPT 遥控在 Windows 上的配对失败（添加设备转圈超时）：`gap_event_cb` 现在处理 `BLE_GAP_EVENT_REPEAT_PAIRING`——当对端（Windows）删除配对记录后重新添加、而本机 NVS 仍残留旧 bond 时，NimBLE host 会静默丢弃配对请求，导致 Windows 永远配不上；现在删除过期 bond 并放行重新配对。同时将 `CONFIG_BT_NIMBLE_MAX_CONNECTIONS` 落到 2，让 Windows 自动重连的 HID 与语音桌面端各占一个连接槽并存。
+- 新增可安装的 Agent 授权面板 PAP 与可编辑的 Web Bluetooth Demo。面板会显示一条紧凑 JSON 请求，允许用户在最多三个选项中选择，通过 Passport Link 回传结果，并按请求 ID 重放重复请求以应对传输重试；Demo 可连接已打开的授权面板，预览实际的 200 字节 payload，发送请求或取消消息，并显示设备响应。
+- 重做原生设置 App，加入四项可直接调整并持久化的功能：默认 50% 的屏幕亮度、默认 30% 且异步试听的系统音量、默认 30 秒的息屏时间，以及默认关闭的按键音开关。单一有界工作任务负责合并 NVS 写入并按需初始化音频；息屏后的第一次按键序列只唤醒屏幕，不会误触发隐藏界面。接入真实 ES8311/I2S 路径后，最终应用镜像为 1203424 字节，Factory 分区仍剩余 62%。
+- 修复 UI 文字全空：启用生成的 RLE 压缩字库所必需的 LVGL 解码器；静态验证与组件配置现在都会拒绝“压缩字库与解码开关不一致”的构建。
+- 用可复现的 Noto Sans SC 14 px / 4 bpp 字库替换覆盖不全的内置 CJK 子集，覆盖全部 3755 个 GB2312 一级常用汉字和两个 Font Awesome 导航图标；16 级 alpha 消除了 2 bpp 边缘量化造成的明显颗粒感，静态检查会锁定源码图、字体 profile、图标范围和解码器。
+- 按真实输入模型重做底部动作提示：系统固定管理上、下键选择区域和按键前缀，插件只通过 `passport.ui.actions` 提供短按确定与长按确定的动作词；超长文案显示省略号，长按确定仍是系统桌面键。原生插件详情页与计数器示例也改成同一套选择模式。
+- 在扩充并平滑中文覆盖的同时，将加入设置功能前的应用镜像从 1346800 字节降至 1146528 字节，减少 200272 字节（14.9%）。4 bpp 方案比中间版本的 16 px / 2 bpp 构建增加 101936 字节，但没有新增 LVGL buffer、task、字体 fallback 或 kerning table；体积优化、仅保留 RGB565 / Label / Flex 的 LVGL 路径、收紧依赖和精简 BLE 功能仍保持启用。
 - 精简仓库根目录：将 GitHub 可识别的社区治理文档迁入 `.github/`，将变更记录迁入 `docs/`，同步全部引用，并在仓库检查中加入根目录文档白名单。
 - 全仓库文档语言规范：所有维护中的 Markdown 默认 `.md` 文件使用英文，简体中文使用配对的 `.zh_CN.md`，双方提供语言切换；静态检查会阻止缺失配对、缺失切换链接或英文默认页混入中文正文。
 - AI 开发流程一期：精简按任务加载的上下文入口，统一本地/CI 验证脚本，新增 PR 自动构建与模板，并提交依赖锁文件以提高构建可复现性。
@@ -46,3 +47,11 @@
 - 同步更新索引：`docs/software-design/README.md`、`README.en_US.md` / `README.zh_CN.md` 的 `docs/` 目录说明。
 - 参考 cindy 仓库文档组织完善索引：新增 `docs/README.md` 根总索引；AGENTS.md 规则索引按触发场景改写（附触发条件）；`docs/contribution/` 与 `docs/development/` 的 README 补充收录标准。
 - 引入社区治理文档（参照 cindy 改写，放仓库根目录）：新增 `CONTRIBUTING.md` / `.zh_CN.md`（贡献指南，针对 ESP-IDF/AI agent/fork 场景改写）、`CODE_OF_CONDUCT.md` / `.zh_CN.md`（贡献者公约）、`SECURITY.md` / `.zh_CN.md`（安全报告流程）、`SUPPORT.md` / `.zh_CN.md`（支持渠道）；AGENTS.md 与 docs/README.md 同步引用。
+
+## Passport Platform v1（本次改造）
+
+- 将硬编码 Demo 菜单改造成中文 Launcher + 单前台 App 管理模型。
+- 新增 `.pap` 可安装 Lua 插件、插件管理、BLE 无系统配对安装与公开设备码目标校验。
+- 新增统一中文页面容器、状态栏、语义化动作提示栏和共享 14 px / 4 bpp 中文字体。
+- 新增轻量主题 token，可通过同一 `.pap` / BLE 链路安装。
+- 新增计数器插件示例、夜间主题示例、打包/检查/BLE 安装工具和完整平台文档。

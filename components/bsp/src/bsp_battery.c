@@ -1,6 +1,6 @@
 // components/bsp/src/bsp_battery.c
-// 移植自 trae_card/components/platform/platform_esp32/src/battery_cw2017.c
-// (去掉了电池 profile 写入部分:开源硬件用户电池各异,用芯片自带 Li-Poly profile 更通用)
+// 芯片自带 Li-Poly profile 不匹配实际电池，SOC 寄存器返回无效值，
+// 改用电压估算。
 #include "bsp_battery.h"
 #include "bsp_i2c.h"
 #include "bsp_pins.h"
@@ -52,18 +52,35 @@ esp_err_t bsp_battery_init(void) {
     }
     ESP_LOGI(TAG, "检测到 CW2017 VERSION=0x%02X", ver);
 
-    // 确保处于正常工作模式(非睡眠/复位态)。用芯片自带 Li-Poly profile,不写自定义 profile。
+    // 确保处于正常工作模式。芯片自带 Li-Poly profile 不匹配实际电池，
+    // SOC 寄存器返回无效值，改用电压估算。
     cw_write(CW_REG_CONFIG, 0x00);
-    vTaskDelay(pdMS_TO_TICKS(100));   // 等首次 SOC 计算完成
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     return ESP_OK;
 }
 
 int bsp_battery_soc(void) {
     uint8_t b[2] = { 0 };
-    if (cw_read(CW_REG_SOC_H, b, 2) != 0) return -1;
-    int soc = b[0];                       // 高字节即整数百分比
-    if (soc > 100) return -1;             // 芯片未就绪时可能读到 0xFF
+    if (cw_read(CW_REG_VCELL_H, b, 2) != 0) return -1;
+    int mv = ((b[0] << 8) | b[1]) & 0x3FFF;
+    mv = (mv * 3125 + 500) / 1000;
+
+    if (mv <= 3000) return 0;
+    if (mv >= 4200) return 100;
+
+    int soc;
+    if (mv <= 3300)
+        soc = (mv - 3000) * 20 / 300;
+    else if (mv <= 3700)
+        soc = 20 + (mv - 3300) * 40 / 400;
+    else if (mv <= 4000)
+        soc = 60 + (mv - 3700) * 30 / 300;
+    else
+        soc = 90 + (mv - 4000) * 10 / 200;
+
+    if (soc < 0) soc = 0;
+    if (soc > 100) soc = 100;
     return soc;
 }
 

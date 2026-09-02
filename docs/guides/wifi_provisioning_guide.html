@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Passport WiFi 配网教程</title>
+<style>
+body{font-family:-apple-system,sans-serif;max-width:400px;margin:20px auto;padding:0 16px;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+h1{font-size:18px;color:#3ECF8E;border-bottom:1px solid #222;padding-bottom:8px}
+.step{background:#111;border:1px solid #222;border-radius:8px;padding:12px 16px;margin:12px 0}
+.num{display:inline-block;width:22px;height:22px;border-radius:50%;background:#3ECF8E;color:#000;text-align:center;line-height:22px;font-size:12px;font-weight:bold;margin-right:8px}
+h2{font-size:15px;margin:0 0 6px 0}
+p{font-size:13px;color:#999;margin:4px 0}
+code{background:#222;padding:2px 6px;border-radius:3px;font-size:12px;color:#3ECF8E}
+.note{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:6px;padding:10px;font-size:12px;color:#aac;margin:16px 0}
+</style>
+</head>
+<body>
+
+<h1>AI Passport BLE 配网教程</h1>
+
+<div class="step">
+  <h2><span class="num">1</span>下载 nRF Connect</h2>
+  <p>手机打开应用商店，搜索 <strong>nRF Connect</strong> 并安装（Nordic Semiconductor 出品，免费）。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">2</span>打开配网页面</h2>
+  <p>设备上进入 <strong>设置 → WiFi 配网</strong>，按 OK 键启动蓝牙广播。</p>
+  <p>屏幕显示 <code>热点已开启</code> 即表示设备正在广播。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">3</span>连接设备</h2>
+  <p>打开 nRF Connect，点击右上角 <strong>SCAN</strong>。</p>
+  <p>在列表中找到 <strong>AI-Passport</strong>，点击 <strong>CONNECT</strong>。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>写入 WiFi 名称</h2>
+  <p>连接后，在 <strong>Unknown Service</strong> 下找到第一个可写的特征（UUID 结尾 0002）。</p>
+  <p>点击它 → <strong>Write</strong> → 输入你的 WiFi 名称 → <strong>Send</strong>。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">5</span>写入 WiFi 密码</h2>
+  <p>找到第二个可写的特征（UUID 结尾 0003）。</p>
+  <p>点击 → <strong>Write</strong> → 输入 WiFi 密码 → <strong>Send</strong>。
+  <br>开放网络可留空或写一个空格。</p>
+</div>
+
+<div class="step">
+  <h2><span class="num">6</span>触发连接</h2>
+  <p>找到第三个可写的特征（UUID 结尾 0004）。</p>
+  <p>点击 → <strong>Write</strong> → 输入 <code>01</code> → 选择 <strong>Hex</strong> 格式 → <strong>Send</strong>。</p>
+  <p>设备收到后会自动连接 WiFi，屏幕显示配网结果。</p>
+</div>
+
+<div class="note">
+  <strong>提示：</strong>
+  <br>• 三个特征必须按顺序写入：SSID → 密码 → 0x01
+  <br>• 写入 0x01 时记得选 <strong>Hex</strong> 格式，不是 Text
+  <br>• 配网成功后设备会重启 BLE 插件服务，可正常安装插件
+  <br>• 配网失败可长按 OK 取消重试
+</div>
+
+</body>
+</html>

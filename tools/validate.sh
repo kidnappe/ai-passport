@@ -13,6 +13,7 @@ run_static_checks() {
     local test_dir
 
     python3 tools/check_repo.py
+    python3 tools/generate_ui_font.py --check
 
     actionlint_bin="${ACTIONLINT_BIN:-}"
     if [[ -z "${actionlint_bin}" ]]; then
@@ -24,11 +25,34 @@ run_static_checks() {
     "${actionlint_bin}" -color .github/workflows/*.yml
 
     test_dir="$(mktemp -d /tmp/ai-passport-host-tests.XXXXXX)"
-    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
-        tests/test_ui_pixel_math.c main/ui_pixel_math.c \
-        -o "${test_dir}/test_ui_pixel_math"
-    "${test_dir}/test_ui_pixel_math"
-    python3 tests/test_verify_firmware.py
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/host_stubs -Icomponents/passport_core/include -Icomponents/passport_link/include \
+        tests/test_passport_link_protocol.c \
+        components/passport_core/src/passport_crc32.c \
+        components/passport_link/src/passport_link_protocol.c \
+        -o "${test_dir}/test_passport_link_protocol"
+    "${test_dir}/test_passport_link_protocol"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/host_stubs -Icomponents/passport_core/include \
+        tests/test_passport_settings_model.c \
+        components/passport_core/src/passport_settings_model.c \
+        -o "${test_dir}/test_passport_settings_model"
+    "${test_dir}/test_passport_settings_model"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/host_stubs -Icomponents/bsp/include -Imain \
+        tests/test_passport_input_policy.c \
+        -o "${test_dir}/test_passport_input_policy"
+    "${test_dir}/test_passport_input_policy"
+    "${CC:-cc}" -std=c99 -O2 -DMAKE_LUA \
+        -Imanaged_components/espressif__lua/lua \
+        managed_components/espressif__lua/lua/onelua.c \
+        -lm -o "${test_dir}/lua"
+    "${test_dir}/lua" tests/test_counter_plugin.lua examples/counter/main.lua
+    "${test_dir}/lua" tests/test_agent_auth_plugin.lua examples/agent-auth-panel/main.lua
+    node tests/test_web_installer_protocol.mjs
+    node tests/test_passport_auth_protocol.mjs
+    python3 tests/test_generate_ui_font.py
+    python3 tests/test_pack_pap.py
     rm -rf "${test_dir}"
     echo "Host tests: PASS"
 }

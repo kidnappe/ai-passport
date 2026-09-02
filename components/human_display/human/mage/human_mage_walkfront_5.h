@@ -1,0 +1,12 @@
+/* 由 png2lvgl.py 自动生成 —— 勿手改 */
+#ifndef LV_IMAGE_HUMAN_MAGE_WALKFRONT_5_H
+#define LV_IMAGE_HUMAN_MAGE_WALKFRONT_5_H
+
+#include "lvgl.h"
+
+LV_IMG_DECLARE(human_mage_walkfront_5);
+
+/* 128x128 LV_COLOR_FORMAT_RGB565A8
+ * LVGL scale 单位: 256 = 100%%, 640 = 250%% (2.5x)
+ * 放大到目标像素宽 TW: lv_image_set_scale(img, TW * 256 / 128) */
+#endif

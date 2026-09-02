@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BLE WiFi 配网</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white; border-radius: 16px; padding: 32px;
+            max-width: 400px; width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 8px; font-size: 24px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 24px; font-size: 14px; }
+        .status-card {
+            background: #f8f9fa; border-radius: 12px; padding: 16px;
+            margin-bottom: 16px; display: none;
+        }
+        .status-card.show { display: block; }
+        .status-icon { font-size: 48px; text-align: center; margin-bottom: 8px; }
+        .status-text { text-align: center; color: #333; font-size: 16px; }
+        .status-subtext { text-align: center; color: #888; font-size: 12px; margin-top: 4px; }
+        .device-list { max-height: 200px; overflow-y: auto; margin-bottom: 16px; }
+        .device-item {
+            background: #f8f9fa; border: 1px solid #e9ecef;
+            border-radius: 8px; padding: 12px 16px;
+            margin-bottom: 8px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .device-item:hover { background: #e9ecef; border-color: #667eea; }
+        .device-item.selected { background: #eef0ff; border-color: #667eea; }
+        .device-name { font-weight: 600; color: #333; margin-bottom: 4px; }
+        .device-info { font-size: 12px; color: #888; }
+        .form-group { margin-bottom: 16px; display: none; }
+        .form-group.show { display: block; }
+        label { display: block; margin-bottom: 6px; font-weight: 500; color: #333; font-size: 14px; }
+        input[type="text"], input[type="password"] {
+            width: 100%; padding: 12px 16px; border: 1px solid #ddd;
+            border-radius: 8px; font-size: 16px; outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: #667eea; }
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; display: none;
+        }
+        .btn.show { display: block; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f1f3f4; color: #333; }
+        .btn-secondary:hover { background: #e8eaed; }
+        .progress-container { display: none; margin-top: 16px; }
+        .progress-container.show { display: block; }
+        .progress-bar { height: 6px; background: #e9ecef; border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.3s; }
+        .progress-text { text-align: center; margin-top: 8px; font-size: 14px; color: #666; }
+        .log-area {
+            background: #1e1e1e; color: #d4d4d4; border-radius: 8px;
+            padding: 12px; font-family: monospace; font-size: 11px;
+            max-height: 150px; overflow-y: auto; display: none;
+        }
+        .log-area.show { display: block; }
+        .log-line { margin: 2px 0; }
+        .log-line.info { color: #4ec9b0; }
+        .log-line.warn { color: #ce9178; }
+        .log-line.error { color: #f44747; }
+        .log-line.success { color: #4ec9b0; }
+        .not-supported { text-align: center; padding: 40px; color: #888; }
+        .not-supported h2 { color: #e74c3c; margin-bottom: 12px; }
+        .qr-placeholder {
+            width: 180px; height: 180px; margin: 16px auto;
+            background: #f0f0f0; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: #999; font-size: 12px; text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div id="unsupported" class="not-supported" style="display:none;">
+            <h2>⚠️ 浏览器不支持 Web Bluetooth</h2>
+            <p>请使用以下浏览器之一：</p>
+            <ul style="text-align:left; max-width:280px; margin:16px auto; line-height:2;">
+                <li>Chrome 56+ (Android/Windows/Mac/Linux)</li>
+                <li>Edge 79+ (Windows/Mac)</li>
+                <li>Opera 43+</li>
+                <li>Samsung Internet 6+</li>
+            </ul>
+            <p style="margin-top:16px; font-size:13px; color:#999;">
+                iOS Safari 暂不支持 Web Bluetooth API<br>
+                请使用安卓手机或电脑端 Chrome/Edge
+            </p>
+            <p style="margin-top:16px; font-size:13px; color:#999;">
+                使用方法: 用 Chrome/Edge 打开本文件即可<br>
+                手机也可用本地服务器访问:
+            </p>
+            <pre style="margin:8px auto; max-width:280px; font-size:11px; background:#f5f5f5; padding:8px; border-radius:4px;">npx serve .<br># 或<br>python -m http.server</pre>
+        </div>
+
+        <div id="main" style="display:none;">
+            <h1>📶 ESP32 BLE 配网</h1>
+            <p class="subtitle">通过蓝牙将 WiFi 凭证发送给设备</p>
+
+            <!-- 步骤 1: 扫描设备 -->
+            <div class="status-card show" id="step-scan">
+                <div class="status-icon" id="scan-icon">🔍</div>
+                <div class="status-text" id="scan-text">点击下方按钮搜索设备</div>
+                <div class="status-subtext">确保设备已进入配网模式</div>
+            </div>
+
+            <div class="device-list" id="device-list"></div>
+
+            <button class="btn btn-primary show" id="btn-scan" onclick="scanDevices()">
+                🔍 扫描设备
+            </button>
+
+            <!-- 步骤 2: 输入凭证 -->
+            <div class="form-group" id="form-creds">
+                <label for="input-ssid">WiFi 名称 (SSID)</label>
+                <input type="text" id="input-ssid" placeholder="请输入 WiFi 名称" autocomplete="off">
+
+                <label for="input-pass" style="margin-top:16px;">WiFi 密码</label>
+                <input type="password" id="input-pass" placeholder="请输入 WiFi 密码 (留空=开放网络)" autocomplete="off">
+            </div>
+
+            <button class="btn btn-primary" id="btn-connect" onclick="sendCredentials()">
+                📡 发送凭证并连接
+            </button>
+
+            <button class="btn btn-secondary" id="btn-back" onclick="backToScan()" style="margin-top:12px;">
+                ← 重新扫描
+            </button>
+
+            <!-- 进度显示 -->
+            <div class="progress-container" id="progress-container">
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                <div class="progress-text" id="progress-text">准备中...</div>
+            </div>
+
+            <!-- 日志 -->
+            <div class="log-area" id="log-area"></div>
+        </div>
+    </div>
+
+    <script>
+        // UUIDs (与 ESP32 端一致)
+        const SERVICE_UUID = '8e7f0001-2b4d-4c9a-b5c1-9e3d6f0a5b21';
+        const CHAR_SSID_UUID = '8e7f0002-2b4d-4c9a-b5c1-9e3d6f0a5b21';
+        const CHAR_PASS_UUID = '8e7f0003-2b4d-4c9a-b5c1-9e3d6f0a5b21';
+        const CHAR_CTRL_UUID = '8e7f0004-2b4d-4c9a-b5c1-9e3d6f0a5b21';
+
+        let device = null;
+        let server = null;
+        let service = null;
+        let ssidChar = null;
+        let passChar = null;
+        let ctrlChar = null;
+
+        const $ = (id) => document.getElementById(id);
+        const log = (msg, type='info') => {
+            const el = $('log-area');
+            el.classList.add('show');
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.appendChild(line);
+            el.scrollTop = el.scrollHeight;
+        };
+
+        // 检查 Web Bluetooth 支持
+        if (!navigator.bluetooth) {
+            $('app').style.display = 'none';
+            $('unsupported').style.display = 'block';
+        } else {
+            $('main').style.display = 'block';
+        }
+
+        // 扫描设备
+        async function scanDevices() {
+            const btn = $('btn-scan');
+            btn.disabled = true;
+            btn.textContent = '🔍 扫描中...';
+            $('device-list').innerHTML = '';
+            log('开始扫描 BLE 设备...');
+
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,          // 显示所有蓝牙设备, 不按名字过滤
+                    optionalServices: [SERVICE_UUID] // 仅为访问授权, 不拦截选择
+                });
+
+                log(`发现设备: ${device.name || '(未命名设备)'} (${device.id})`, 'success');
+                addDeviceToList(device);
+                showCredentialsForm();
+
+            } catch (err) {
+                if (err.name !== 'NotFoundError') {
+                    log(`扫描错误: ${err.message}`, 'error');
+                } else {
+                    log('未选择设备', 'warn');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 重新扫描';
+            }
+        }
+
+        function addDeviceToList(dev) {
+            const list = $('device-list');
+            const item = document.createElement('div');
+            item.className = 'device-item selected';
+            item.innerHTML = `
+                <div class="device-name">${dev.name || '未知设备'}</div>
+                <div class="device-info">ID: ${dev.id} | ${dev.gatt ? '已连接' : '未连接'}</div>
+            `;
+            list.appendChild(item);
+        }
+
+        function showCredentialsForm() {
+            $('step-scan').classList.remove('show');
+            $('form-creds').classList.add('show');
+            $('btn-connect').classList.add('show');
+            $('btn-back').classList.add('show');
+            $('btn-scan').classList.remove('show');
+            log('请输入 WiFi 凭证');
+        }
+
+        function backToScan() {
+            $('form-creds').classList.remove('show');
+            $('btn-connect').classList.remove('show');
+            $('btn-back').classList.remove('show');
+            $('btn-scan').classList.add('show');
+            $('step-scan').classList.add('show');
+            if (server) {
+                server.disconnect();
+                server = null;
+            }
+        }
+
+        // 连接设备并发送凭证
+        async function sendCredentials() {
+            const ssid = $('input-ssid').value.trim();
+            const pass = $('input-pass').value;
+
+            if (!ssid) {
+                alert('请输入 WiFi 名称');
+                return;
+            }
+
+            $('form-creds').classList.remove('show');
+            $('btn-connect').classList.remove('show');
+            $('btn-back').classList.remove('show');
+            $('progress-container').classList.add('show');
+            updateProgress(10, '连接蓝牙设备...');
+
+            try {
+                // 连接 GATT 服务器
+                log('连接设备...');
+                updateProgress(20, '连接蓝牙设备...');
+                server = await device.gatt.connect();
+                log('已连接，获取服务...');
+                updateProgress(40, '获取服务...');
+
+                service = await server.getPrimaryService(SERVICE_UUID).catch(e => {
+                    if (e.name === 'NotFoundError') {
+                        throw new Error('该设备没有配网服务——选中的不是 AI-Passport, 请重新扫描选择');
+                    }
+                    throw e;
+                });
+                log('服务获取成功', 'success');
+                updateProgress(60, '获取特征值...');
+
+                ssidChar = await service.getCharacteristic(CHAR_SSID_UUID);
+                passChar = await service.getCharacteristic(CHAR_PASS_UUID);
+                ctrlChar = await service.getCharacteristic(CHAR_CTRL_UUID);
+                log('特征值获取成功', 'success');
+                updateProgress(80, '发送 WiFi 凭证...');
+
+                // 发送 SSID
+                log(`发送 SSID: ${ssid}`);
+                await ssidChar.writeValue(new TextEncoder().encode(ssid));
+                log('SSID 发送成功', 'success');
+                updateProgress(90, '发送密码...');
+
+                // 发送密码
+                await passChar.writeValue(new TextEncoder().encode(pass));
+                log('密码发送成功', 'success');
+                updateProgress(95, '触发连接...');
+
+                // 发送连接命令 (0x01 = 开始连接)
+                await ctrlChar.writeValue(new Uint8Array([0x01]));
+                log('连接命令已发送', 'success');
+                updateProgress(100, '等待设备连接 WiFi...');
+
+                log('凭证已发送，等待设备连接...', 'success');
+
+                // 监听断开连接
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+            } catch (err) {
+                log(`错误: ${err.message}`, 'error');
+                resetUI();
+            }
+        }
+
+        function onDisconnected() {
+            log('设备已断开连接', 'warn');
+            setTimeout(resetUI, 2000);
+        }
+
+        function updateProgress(percent, text) {
+            $('progress-fill').style.width = percent + '%';
+            $('progress-text').textContent = text;
+        }
+
+        function resetUI() {
+            $('progress-container').classList.remove('show');
+            $('form-creds').classList.add('show');
+            $('btn-connect').classList.add('show');
+            $('btn-back').classList.add('show');
+            $('progress-fill').style.width = '0%';
+        }
+
+        // 页面加载时检查
+        window.addEventListener('load', () => {
+            log('就绪。点击"扫描设备"开始配网。');
+        });
+    </script>
+</body>
+</html>

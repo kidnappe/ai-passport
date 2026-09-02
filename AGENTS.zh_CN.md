@@ -9,16 +9,14 @@
 ## 项目与安全基线
 
 - 目标平台：ESP32-C3、8 MB Flash、无 PSRAM、ESP-IDF 5.5.3。
-- 必须保持小程序 BLE 安装兼容：3 MB 应用上限、`cardid@0x356000`、
-  永久 `recovery@0x700000` 以及上键持续 5 秒进入 Recovery 的 bootloader hook
-  均为模板强制契约。
 - 保留用户已有修改。先执行 `git status --short --branch`，不得覆盖或清理无关文件。
-- 硬件事实优先级：产品规格与实测结果 → `components/bsp/include/bsp_pins.h` → BSP 头文件与实现 → 硬件指南 → README/demo。任务所需硬件细节未在这些来源中定义时，直接询问用户，不得猜测。
+- 硬件事实优先级：原理图/PCB 与实测结果 → `components/bsp/include/bsp_pins.h` → BSP 头文件与实现 → 硬件指南 → README/demo。未知硬件事实必须报告，不得猜测。
 - 可复用板级逻辑放入 `components/bsp`；页面、状态机、动画和应用任务放入 `main`。
 - LVGL 非线程安全。LVGL 任务之外访问 LVGL 对象时必须持有 `bsp_lvgl_lock()`。
 - 按键回调不得阻塞。音频、存储、网络等慢操作必须放入工作任务。
-- demo 删除 screen 前，必须停止所有可能访问其 UI 的任务、定时器、回调和事件处理器。
+- 页面删除 screen 前，必须停止所有可能访问其 UI 的任务、定时器、回调和事件处理器。
 - 可测试的状态机、协议、计时和布局计算应与 ESP-IDF/LVGL 解耦，并由 host tests 覆盖。
+- 每完成一个功能必须执行 cleanup pass：删除旧实现、未引用函数、重复 helper、临时日志、无用 include/资源；有 ESP-IDF 环境时同步检查 `idf.py size-components` 与 `idf.py size-files`。
 - 禁止提交凭证、设备二维码秘密、私钥、个人数据或未脱敏日志。
 - 所有维护中的 Markdown 默认 `.md` 路径必须为英文，简体中文使用配对的 `.zh_CN.md` 文件。两种语言必须保持一致并保留互相切换链接。
 
@@ -26,17 +24,16 @@
 
 | 任务 | 修改前读取 |
 | --- | --- |
-| 任意代码修改 | `docs/development/ai-guide.zh_CN.md`、相关头文件和相邻实现 |
-| 环境引导或缺少工具链 | `docs/development/engineering/environment-setup.zh_CN.md` |
+| 任意代码修改 | `docs/development/agent-guide.zh_CN.md`、相关头文件和相邻实现 |
 | BSP、引脚、总线、显示、音频、电池 | `docs/hardware-design/AI_HARDWARE_DEVELOPMENT_GUIDE.zh_CN.md`、`components/bsp/include/bsp_pins.h` |
-| Demo 或菜单 | `main/demo.h`、`main/main.c`、最近的 `main/demo_*.c` 实现 |
-| 构建、测试、依赖、分区 | `docs/development/engineering/build-and-test.zh_CN.md`、`docs/development/engineering/ble-recovery-compatibility.zh_CN.md`、`sdkconfig.defaults`、`partitions.csv` |
-| CI 或发布 | `docs/development/ci/CI-*.zh_CN.md` 中的对应文件与 `.github/workflows/` |
-| 项目开发完成 | `docs/development/release/project-completion.zh_CN.md`（再进入 `issue-suggestions` 或 `experience-pr` skill） |
-| 文档 | `docs/contribution/doc-conventions.zh_CN.md`、`docs/README.zh_CN.md` |
+| 系统 App、插件、页面或菜单 | `docs/platform/architecture.zh_CN.md`、`docs/platform/system-api.zh_CN.md`、`main/main.c` |
+| `.pap`、BLE 安装或 Passport Link | `docs/platform/package-format.zh_CN.md`、`docs/platform/passport-link.zh_CN.md`、相关 `passport_*` 头文件 |
+| 构建、测试、依赖、分区 | `docs/development/build-and-test.zh_CN.md`、`sdkconfig.defaults`、`partitions.csv` |
+| CI 或发布 | `docs/development/CI-*.zh_CN.md` 中的对应文件与 `.github/workflows/` |
+| 文档 | `docs/contribution/doc-conventions.zh_CN.md`、`docs/INDEX.zh_CN.md` |
 | Commit 或 PR | `docs/contribution/commit-and-pr.zh_CN.md` |
 
-产品概览与文档索引见 `docs/README.zh_CN.md`。详细的 AI 开发工作流（上下文建立、事实来源优先级、应用/BSP 边界、运行时规则、素材放置、交付格式）见 `docs/development/ai-guide.zh_CN.md`。Fork 专用流程见 `docs/fork-guide.zh_CN.md`，普通上游开发无需读取。
+产品概览见 `docs/README.zh_CN.md`；需要发现更多文档时读 `docs/INDEX.zh_CN.md`。Fork 专用流程见 `docs/fork-guide.zh_CN.md`，普通上游开发无需读取。
 
 ## 必须执行的验证与交付格式
 

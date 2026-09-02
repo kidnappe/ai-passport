@@ -6,14 +6,14 @@
 
 ## Unreleased
 
-- Reorganized the documentation by function area with a dual entry point: the root `AGENTS.md` is now a thin router (hard constraints + task routing only) and the detailed AI workflow lives in `docs/development/ai-guide.md`; `agent-guide.md` was folded in. `docs/development/` gained a second level (`engineering/`, `ci/`, `release/`), and the `plays/` application archive and `experiences/` moved into a `docs/reference/` area with a dedicated README. Removed `docs/software-design/` (empty scaffold); folded the three `assets/{fonts,images,music}/README` leaves into the `assets/` README; flattened the six `project-completion` sub-documents into a single file; and unified each directory to a single README, eliminating every `INDEX` file and a duplicated experience index. All cross-references and bibliographic links were updated; no content was dropped.
-
-- Made mini-program BLE install compatibility a template-level invariant: fixed
-  protected `cardid`/Recovery partitions, retained the five-second UP-key
-  Recovery boot hook, and added CI validation for merged-image structure,
-  partition MD5/ranges, the 3 MB app limit, and protected payload exclusion.
-- Documented a release-title convention for multi-app releases: name tags as `v<version>-<app-name>` (e.g. `v0.1.0-voice-keychain`) so the release title carries the version and the app, and confirm the title after the release is published so a release list is scannable by app.
-- Added a post-release follow-up workflow: an `issue-suggestions` skill for filing user feedback as issues against the upstream project, an `experience-pr` skill for submitting reusable development experience as a documentation PR, a `docs/experiences/` directory for per-entry experience files, and supporting `project-completion`, `file-issues`, and experience-index documents.
+- Fixed the voice input service becoming unreachable after the HID keyboard had been used for a while (the desktop client reported `Characteristic 0xA2B2 not found`). `voice_ble_register()` previously guarded itself with a one-shot flag, but leaving/entering the voice or PPT page re-initializes NimBLE and tears down the whole GATT table, so the voice service never re-entered the fresh table; it now re-registers the GATT services and GAP listener on every NimBLE instance. The voice page also advertises on its own derived random address so Windows no longer claims the voice link as a bonded keyboard, plus two fixes to advertising restart and connection counting.
+- Fixed PPT remote pairing failing on Windows (the "Add device" spinner timing out): `gap_event_cb` now handles `BLE_GAP_EVENT_REPEAT_PAIRING`. When the peer (Windows) deletes its pairing and re-adds the device while the local NVS still holds a stale bond, the NimBLE host silently discards the pairing request and Windows can never pair; we now delete the expired bond and allow re-pairing. Also landed `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2` so Windows's auto-reconnecting HID and the voice desktop client each get their own connection slot.
+- Added the installable Agent authorization panel PAP and an editable Web Bluetooth demo. The panel displays one compact JSON request, lets the user choose up to three options, sends the result over Passport Link, and replays duplicate request IDs for delivery retries; the demo connects to an already-open panel, previews the exact 200-byte-bounded payload, sends requests or cancellations, and shows device responses.
+- Rebuilt the native Settings app around four direct, persistent controls: 50%-default display brightness, 30%-default system volume with asynchronous preview, a 30-second-default screen timeout, and a key-sound switch that defaults off. A single bounded worker coalesces NVS writes and lazily initializes audio; the first key sequence after screen-off now wakes without activating the hidden UI. Linking the real ES8311/I2S path brings the final application image to 1,203,424 bytes, still leaving 62% of the factory partition free.
+- Fixed blank UI text by enabling the LVGL decoder required by the generated RLE-compressed font; static validation and component configuration now reject a compressed-font/decoder mismatch.
+- Replaced the incomplete built-in CJK subset with a reproducible 14 px / 4 bpp Noto Sans SC font covering all 3,755 GB2312 level-one common ideographs and two Font Awesome navigation icons; 16 alpha levels remove the visible 2 bpp edge quantization, while static checks lock the source graph, profile, icon range, and decoder.
+- Redesigned the bottom action hints around the real input model: the system owns the UP/DOWN selection slot and button prefixes, plug-ins provide only short-OK and long-OK action nouns through `passport.ui.actions`, long labels are ellipsized, and long-OK remains system Home. Native plugin details and the counter sample now follow the same selection pattern.
+- Reduced the pre-settings application image from 1,346,800 to 1,146,528 bytes (200,272 bytes, 14.9%) while expanding and smoothing Chinese coverage. The 4 bpp profile adds 101,936 bytes over the interim 16 px / 2 bpp build but does not add an LVGL buffer, task, font fallback, or kerning table; size optimization, the RGB565/Label/Flex-only LVGL paths, tightened dependencies, and the reduced BLE feature set remain enabled.
 - Simplified the tracked repository root: moved GitHub-recognized community documents into `.github/`, moved the changelog into `docs/`, updated every reference, and added a root-document allowlist to repository checks.
 - Repository-wide language policy: every maintained Markdown default `.md` file is English, Simplified Chinese uses a paired `.zh_CN.md`, and both provide language switches. Static checks reject missing peers, missing switches, and Chinese prose in English defaults.
 - Phase one of the AI development workflow: streamlined task-based context routing, unified local/CI validation, added PR checks and a template, and committed the dependency lock for reproducible builds.
@@ -47,3 +47,11 @@
 - Updated software-design and project README references for the new documentation structure.
 - Added the documentation catalog and task-triggered routing based on the earlier repository model.
 - Added bilingual contribution, code-of-conduct, security, and support documents tailored to this ESP-IDF and fork workflow.
+
+## Passport Platform v1 (this rewrite)
+
+- Replaced the hard-coded demo menu with a Chinese launcher and single-foreground app model.
+- Added installable `.pap` Lua plugins, plugin management, unpaired BLE installation, and public device-code target checks.
+- Added a shared Chinese page container, status bar, semantic action-hint bar, and one 14 px / 4 bpp system font.
+- Added lightweight theme tokens installable through the same `.pap` and BLE path.
+- Added a counter plugin sample, night theme sample, package tools, BLE install tool, and platform documentation.

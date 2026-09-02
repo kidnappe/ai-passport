@@ -2,25 +2,20 @@
 CONFIG_IDF_TARGET="esp32c3"
 # 注:ESP32-C3 无 PSRAM,故不设 CONFIG_SPIRAM。
 
+# --- 构建优化 ---
+# 设备固件按体积优化；调试符号仍保留在 ELF 中，不进入烧录镜像。
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+# CONFIG_COMPILER_OPTIMIZATION_DEBUG is not set
+
 # --- Flash ---
-# FoloToy AI Passport 当前产品/固件基线使用 8MB Flash。
+# FoloToy AI Passport 的所有硬件批次均使用 8MB Flash。
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 # 固定 8MB 镜像头，关闭 detect，便于 idf.py merge-bin。
 CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE=n
-# 3 MB 应用上限与小程序 BLE Recovery 安装器保持一致。分区表
-# 还固定保留 cardid@0x356000 与 recovery@0x700000，二创不得改动。
+# Passport Platform v1 保留 3MB factory 固件，其余约 4.94MB 用作 wear-levelled FAT 插件/主题分区。
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
-
-# 开机持续按住上键（GPIO0）5 秒，由自定义 bootloader 跳转到工厂
-# 预装的 0x700000 Recovery。这些选项为 bootloader 提供长按检测配置。
-CONFIG_BOOTLOADER_FACTORY_RESET=y
-CONFIG_BOOTLOADER_NUM_PIN_FACTORY_RESET=0
-CONFIG_BOOTLOADER_FACTORY_RESET_PIN_LOW=y
-CONFIG_BOOTLOADER_OTA_DATA_ERASE=y
-CONFIG_BOOTLOADER_DATA_FACTORY_RESET=""
-CONFIG_BOOTLOADER_HOLD_TIME_GPIO=5
 
 # --- 控制台:USB-Serial-JTAG(C3 原生 USB,GPIO18/19)---
 # 不用 UART0:其默认 TX=GPIO21 与本板背光引脚冲突。
@@ -29,23 +24,135 @@ CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 
 # --- LVGL ---
 CONFIG_LV_COLOR_DEPTH_16=y
-CONFIG_LV_FONT_MONTSERRAT_14=y
-CONFIG_LV_FONT_MONTSERRAT_20=y
+# UI 统一使用仓库生成的 14px / 4bpp 简体中文字库，不允许系统 App 各自启用字号。
+# CONFIG_LV_FONT_MONTSERRAT_14 is not set
+# CONFIG_LV_FONT_MONTSERRAT_20 is not set
+# CONFIG_LV_FONT_SOURCE_HAN_SANS_SC_16_CJK is not set
+# CONFIG_LV_FONT_DEFAULT_SOURCE_HAN_SANS_SC_16_CJK is not set
+# LVGL 需要一个编译期默认字体；实际 UI 全部继承 passport_ui_font_zh_14。
+CONFIG_LV_FONT_UNSCII_8=y
+CONFIG_LV_FONT_DEFAULT_UNSCII_8=y
+# passport_ui_font_zh_14 的 bitmap_format=1，必须启用 RLE 解码；关闭时 LVGL 会为每个字形返回 NULL。
+CONFIG_LV_USE_FONT_COMPRESSED=y
+
+# 面板只以 RGB565 绘制，字节交换在 esp_lvgl_port 刷屏阶段完成。
+CONFIG_LV_DRAW_SW_SUPPORT_RGB565=y
+# CONFIG_LV_DRAW_SW_SUPPORT_RGB565_SWAPPED is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_RGB565A8 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_RGB888 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_XRGB8888 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_L8 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_AL88 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_A8 is not set
+# CONFIG_LV_DRAW_SW_SUPPORT_I1 is not set
+
+# Passport UI 只用基础对象、Label 与 Flex；其余 widget/theme 不进入固件。
+CONFIG_LV_USE_LABEL=y
+# CONFIG_LV_USE_ANIMIMG is not set
+# CONFIG_LV_USE_ARC is not set
+# CONFIG_LV_USE_ARCLABEL is not set
+# CONFIG_LV_USE_BAR is not set
+# CONFIG_LV_USE_BUTTON is not set
+# CONFIG_LV_USE_BUTTONMATRIX is not set
+# CONFIG_LV_USE_CALENDAR is not set
+# CONFIG_LV_USE_CANVAS is not set
+# CONFIG_LV_USE_CHART is not set
+# CONFIG_LV_USE_CHECKBOX is not set
+# CONFIG_LV_USE_DROPDOWN is not set
+CONFIG_LV_USE_IMAGE=y
+# CONFIG_LV_USE_IMAGEBUTTON is not set
+# CONFIG_LV_USE_KEYBOARD is not set
+# CONFIG_LV_USE_LED is not set
+# CONFIG_LV_USE_LINE is not set
+# CONFIG_LV_USE_LIST is not set
+# CONFIG_LV_USE_MENU is not set
+# CONFIG_LV_USE_MSGBOX is not set
+# CONFIG_LV_USE_ROLLER is not set
+# CONFIG_LV_USE_SCALE is not set
+# CONFIG_LV_USE_SLIDER is not set
+# CONFIG_LV_USE_SPAN is not set
+# CONFIG_LV_USE_SPINBOX is not set
+# CONFIG_LV_USE_SPINNER is not set
+# CONFIG_LV_USE_SWITCH is not set
+# CONFIG_LV_USE_TEXTAREA is not set
+# CONFIG_LV_USE_TABLE is not set
+# CONFIG_LV_USE_TABVIEW is not set
+# CONFIG_LV_USE_TILEVIEW is not set
+# CONFIG_LV_USE_WIN is not set
+# CONFIG_LV_USE_THEME_DEFAULT is not set
+# CONFIG_LV_USE_THEME_SIMPLE is not set
+CONFIG_LV_USE_FLEX=y
+# CONFIG_LV_USE_GRID is not set
+# CONFIG_LV_USE_OBSERVER is not set
+
+# 复用已经链接的 libc 字符串与格式化实现，避免 LVGL 再带一份。
+# CONFIG_LV_USE_BUILTIN_STRING is not set
+CONFIG_LV_USE_CLIB_STRING=y
+# CONFIG_LV_USE_BUILTIN_SPRINTF is not set
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_BUILD_EXAMPLES=n
+CONFIG_LV_BUILD_DEMOS=n
 # LVGL 内置 malloc 池大小(KB)。它是独立静态区、不与系统堆共享,配大了会白白占用 RAM。
 # 本 demo UI 简单,24KB 足够;若自建复杂界面出现绘制卡死/看门狗,调大此值。
 CONFIG_LV_MEM_SIZE_KILOBYTES=24
 
 # --- 系统 ---
 CONFIG_FREERTOS_HZ=1000
+# 100 ms 双击窗口兼顾快速连按与单击响应；原生上下键双击会明确移动两格，不再丢失。
+CONFIG_BUTTON_SHORT_PRESS_TIME_MS=100
+# 系统级长按确定返回主页保持有意触发，同时由默认 1500 ms 缩短到 800 ms。
+CONFIG_BUTTON_LONG_PRESS_TIME_MS=800
+# 固件不在运行时调整日志等级，省去 tag-level 缓存与查找逻辑。
+# CONFIG_LOG_DYNAMIC_LEVEL_CONTROL is not set
+
+# --- FAT appfs: 插件 ID 需要长文件名；LFN 缓冲放 heap，所有文件共用扇区缓存。 ---
+CONFIG_FATFS_LFN_HEAP=y
+CONFIG_FATFS_MAX_LFN=96
+# CONFIG_FATFS_PER_FILE_CACHE is not set
+# CONFIG_FATFS_USE_DYN_BUFFERS is not set
 
 # --- Bluetooth LE / NimBLE ---
 # ESP32-C3 仅支持 BLE；示例只启用单连接 peripheral 所需的最小 host 配置。
+# ⚠️ CONFIG_BT_NIMBLE_ROLE_CENTRAL 必须为 y：voice_ble.c 用 ble_gattc_exchange_mtu()
+#   把 ATT MTU 从 23 升到 185（Mac central 不主动交换 MTU，需外设发起），而
+#   CONFIG_BT_NIMBLE_GATT_CLIENT depends on ROLE_CENTRAL，关掉会导致 GATT client
+#   被裁剪、链接 undefined reference。BLE 时代实际编译的 sdkconfig 里二者均为 y。
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
-CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
 CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
 CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
 CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+# 连接槽 = 2：HID(Windows 系统, PPT 遥控) 与 语音桌面端(bleak, 0xA2B0) 是两个
+# 独立客户端。MAX_CONNECTIONS=1 时 Windows 对已配对 HID 键盘会自动重连、占满唯一
+# 槽 → 语音桌面端扫不到设备(设备已连接态不再发可连接广播)。改 2 让两者各占一槽
+# 并存，互不抢占。controller 侧 CONFIG_BT_CTRL_BLE_MAX_ACT=6 足够支撑。
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
 CONFIG_BT_NIMBLE_HOST_BASED_PRIVACY=n
-CONFIG_BT_NIMBLE_NVS_PERSIST=n
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# Passport Link 明确定义为免配对 GATT 服务，不编译未使用的 SMP/链路加密与扫描角色。
+# 注:PPT 遥控(HID 键盘)需要主机配对,故启用 SM + SC(Just Works,无输入输出,
+#     voice_ble 的 sm_io_cap=NO_INPUT_OUTPUT 与之一致,配对免输码)。
+#     NVS_PERSIST=y:把 bond(LTK/配对凭据)持久化到 NVS,否则每次进出 PPT 页
+#     BLE 栈重启后 bond 丢失,Windows 无法自动重连已配对设备(需反复配对)。
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=y
+CONFIG_BT_NIMBLE_SM_SC=y
+CONFIG_BT_NIMBLE_SM_LEGACY=y
+# CONFIG_BT_CTRL_BLE_SECURITY_ENABLE is not set
+# CONFIG_BT_CTRL_BLE_SCAN is not set
+# CONFIG_BT_NIMBLE_EXT_SCAN is not set
+# CONFIG_BT_NIMBLE_ENABLE_PERIODIC_SYNC is not set
+# CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT is not set
+CONFIG_BT_NIMBLE_ATT_MAX_PREP_ENTRIES=4
+CONFIG_BT_NIMBLE_GATT_MAX_PROCS=1
+CONFIG_ESP_SYSTEM_USE_FRAME_POINTER=y
+CONFIG_BT_NIMBLE_GATT_CLIENT=y
+# PPT 遥控:启用官方 esp_hid 组件所需的 NimBLE 标准 HID 服务(0x1812)。
+# 这是 Windows 能识别为键盘的前提(手写 NimBLE GATT 在 Windows 上认不成键盘,
+# 见 ai-passport-ppt docs/development-log.md)。esp_hid 组件的 NimBLE 后端
+# nimble_hidd.c 编译依赖本开关,并注册 HID+BAS+DIS 标准 GATT。
+CONFIG_BT_NIMBLE_HID_SERVICE=y
+CONFIG_BT_NIMBLE_SVC_HID_MAX_INSTANCES=1
+CONFIG_BT_NIMBLE_SVC_HID_MAX_RPTS=3

@@ -1,0 +1,9 @@
+# o-platform 仿真构建开关 —— 配合 ai-passport-simulator(QEMU) 使用
+config O_PLATFORM_SIM_MODE
+    bool "QEMU 仿真构建（跳过 WiFi/BLE 射频操作）"
+    default n
+    help
+        ai-passport-simulator 的 QEMU 无射频硬件，esp_wifi_start 之后
+        wifi 任务会在射频校准处死循环并饿死 CPU。仿真构建开启此开关后，
+        wifi_sta / ble_prov 的射频入口直接返回，其余功能照常运行。
+        此开关仅用于仿真 profile，真机构建保持关闭。

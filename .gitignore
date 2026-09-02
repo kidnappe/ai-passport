@@ -2,5 +2,32 @@ build/
 sdkconfig
 sdkconfig.old
 managed_components/
+__pycache__/
+*.py[cod]
 .vscode/
 .idea/
+
+# ESP-IDF 构建产物（不入库）
+bootloader-prefix/
+compile_commands.json
+component_manager_run_counter.*
+config.env
+config/
+gdbinit/
+projects/
+kconfigs.in
+kconfigs_projbuild.in
+ldgen_libraries
+ldgen_libraries.in
+flash_app_args
+flash_bootloader_args
+flash_project_args
+flasher_args.json
+components_with_manifests_list.*
+
+# 移植 donor 克隆（自带 .git，不入库；来源与 commit 记录在 NOTES.md）
+references/
+
+# 串口/诊断日志（采集脚本输出，不入库）
+tools/*.txt
+tools/*.log
